@@ -2,23 +2,46 @@
 
 ## Project Overview
 
-Project-based analysis of high-dimensional genomic data, focusing on data preprocessing, exploratory analysis, dimension reduction, statistical modeling, and reproducible research practices. Meant to demonstrate proficiency and mastery of core data science skills through iterative analysis. 
+Project-based analysis of high-dimensional genomic data, focusing on data preprocessing, exploratory analysis, dimension reduction, statistical modeling, and reproducible research practices. Meant to demonstrate proficiency and mastery of core data science skills through iterative analysis.
 
-TODO: Mermaid chart: Research Question --> data --> preprocessing --> dimensional reduction --> predictive modeling --> interpretation
+```mermaid
+---
+config:
+  theme: mc
+  layout: dagre
+title: 🗣️ Analyzing & Interpreting
+---
+flowchart LR
+    Hypothesis["🧠
+        Hypothesis"]
+    Data["⛏️
+        Data Mining"]
+    Preprocessing["🧹
+        Preprocessing"]
+    Reduction["📦
+        Dimensional Reduction"]
+    Predictive["🤖
+        Predictive Modeling"]
 
-### Hypothesis
+    Hypothesis --> Data
+    Data --> Preprocessing
+    Preprocessing --> Reduction
+    Reduction --> Predictive
+```
 
-Small, reasonable changed is preprocessing and modeling choices can substantially alter downstream conclusions in high-dimensional gene expression analysis. 
+### 🧠 Hypothesis
+
+Small, reasonable changes in preprocessing and modeling choices can substantially alter downstream conclusions in high-dimensional gene expression analysis.
 
 "How many small, reasonable choices does it take to rewrite the data story?"
 
-### Dataset
+### ⛏️ Data Mining
 
-TODO: Finalize / pick one
-
-NOTE: Everything is focused on the "meta hypothesis" (in the Hypothesis section) which we'll demonstrate with a particular dataset, and a "sub hypothesis" defined in each option below. 
+> [!NOTE]
+> These options are how we'll explore the lens of the "meta hypothesis" (see the Hypothesis section)
 
 Options:
+
 - Option 1: Tumor vs Normal, gene expression profiles can reliably distinguish tumor samples from normal tissue (...and this separation is robust across reasonable preprocessing and modeling choices)
 - Option 2: Cancer Subtype Classification, distinct molecular subtypes of cancer exhibit seperable gene expression patterns (...that can be detected using dimensional reduction and supervised modeling)
 - Option 3: Survival, gene expression patterns are associated with patient survival outcomes (... and can be used to distinguish high-risk from low-risk groups)
@@ -26,16 +49,51 @@ Options:
   - NOTE: This is a more technical option, not really about the biology itself
 - Option 5: Predicting Treatmeant Response, pre-treatment gene expression profiles are predictive of response to a given therapy.
 
+### 🧹 Preprocessing
+
+> [!CAUTION]
+> TODO / Coming Soon...
+
+### 📦 Dimensional Reduction
+
+> [!CAUTION]
+> TODO / Coming Soon...
+
+### 🤖 Predictive Modeling
+
+> [!CAUTION]
+> TODO / Coming Soon...
+
 ## Project Management
+
+Project Management will be done in our GitHub Project: [Genomics Data Mining Project Plan & Execution](https://github.com/users/anime4tw/projects/2)
 
 ### Requirements Traceability
 
-TODO: Mermaid chart rubric --> epics --> tasks --> evidence
+```mermaid
+flowchart LR
+    Rubric@{ shape: doc, label: Rubric}
+    Deliverable@{ shape: bow-rect, label: "Atomic Deliverables"}
+    Epic@{ shape: processes, label: "Epics"}
+    Task@{ shape: process, label: "Tasks"}
+    Evidence@{ shape: lin-cyl, label: "Evidence"}
+    
+    Rubric -->|Decomposed| Deliverable
+    Deliverable -->|Mapped 1:1| Epic
+    Epic -->|Broken down 1:M| Task
+    Task -->|Create| Evidence
+```
 
-- Rubric is defined by document _________, they are broken down into individual requirements (i.e., "Atomic Deliverables")
-- Epics are the atomic deliverables. (TODO can we reference a project object like the Epic type here?) (i.e., GitHub Issues of Type Epic)
-- Tasks break down epics into specific work that will be completed (i.e., GitHub Issues of Type Task)
-- Evidence is the actual deliverable/reproducible output of the task (i.e., Repo Artifacts / Files / Documents / etc.)
+This project follows an explicit requirements traceability model to ensure full coverage of the course evaluation rubric.
+
+- The evaluation **Rubric** (as defined in the course syllabus) is the source of all requirements
+- **Atomic Deliverables** represent single assessable requirements, decomposed from the Rubric
+  - The authoritative list of Atomic Deliverables is maintained in  [docs/rubric_atomic_deliverables.csv](docs/rubric_atomic_deliverables.csv)
+- **Epics** are Atomic Deliverables (there is a 1:1 relationship) implemented in GitHub as GitHub Issues. Custom field "Type" = ```Epic```
+- **Tasks** break down Epics into concrete units of work completed during weekly iterations. Custom field "Type" = ```Task```
+- **Evidence** consists of reproducible project artifacts (e.g., notebooks, data files, documentation, figures) produced by Tasks and stored in this repository
+
+This traceability model ensures that all work can be mapped unambiguously from rubric → Epic → Task → Evidence.
 
 ### Milestones  |  Semantic Versioning
 
@@ -70,10 +128,10 @@ gantt
     Final Project Submitted :vert,        vv3,          2026-04-02,    0d
 ```
 
-#### Phases 
+#### Phases
 
 | Phase | Start Date | Start Time | End Date | End Time |
-| -----| -------------| ---------- | ---------- | -------- |
+| ----- | ---------- | ---------- | -------- | -------- |
 | Initialization | Thursday, January 22, 2026 | 00:00 | Wednesday, January 28, 2026 | 23:59 |
 | Proposal | Thursday, January 29, 2026 | 00:00 | Wednesday, February 25, 2026 | 23:59 |
 | Analysis | Thursday, February 26, 2026 | 00:00 | Wednesday, March 11, 2026 | 23:59 |
@@ -81,59 +139,59 @@ gantt
 
 #### Milestones
 
-| Milestone | Version | Date | Time |
+A milestone is a point in time, which for us, is tied directly to a real deliverable/evidence. The **version** begins when the milestone has been reached. For example, v0.1 begins when Status Update 1 has been merged into the repo, until that point it would be v0.0.x.
+
+| Milestone | Due Date | Due Time | Version |
 | --------- | ------- | ---- | ---- |
-| Status Update 1 | v0.1 | Wednesday, January 28, 2026 | 23:59 |
-| Proposal Submitted | v1 | Wednesday, February 04, 2026 | 23:59 |
-| Status Update 2 | v1.1 | Wednesday, February 11, 2026 | 23:59 |
-| Proposal Finalized | v2 | Wednesday, February 25, 2026 | 23:59 |
-| Status Update 3 | v2.1 | Wednesday, March 04, 2026 | 23:59 |
-| Status Update 4 | v2.2 | Wednesday, March 11, 2026 | 23:59 |
-| Final Project Submitted | v3 | Wednesday, April 01, 2026 | 23:59 |
+| Status Update 1 | Wednesday, January 28, 2026 | 23:59 | v0.1 |
+| Proposal Submitted | Wednesday, February 04, 2026 | 23:59 | v1 |
+| Status Update 2 | Wednesday, February 11, 2026 | 23:59 | v1.1 |
+| Proposal Finalized | Wednesday, February 25, 2026 | 23:59 | v2 |
+| Status Update 3 | Wednesday, March 04, 2026 | 23:59 | v2.1 |
+| Status Update 4 | Wednesday, March 11, 2026 | 23:59 | v2.2 |
+| Final Project Submitted | Wednesday, April 01, 2026 | 23:59 | v3 |
 
-The date-time represents when the version begins, and is always marked by the release of the specific milestone evidence. 
+The date-time represents when the version begins, and is always marked by the release of the specific milestone evidence.
 
-### Iterationas
+### Iterations
 
-We will be using a weekly iteration, which starts on a Thursday 00:00 and ends on the Wednesday 23:59
+Project work is organized into weekly plans, called Iterations. They are managed through our GitHub Project.
 
-TODO: Can we reference project iterations here? 
-
-NOTE: Iterations apply to Tasks, not epics. 
+- Each iteration begins on Thursday at 00:00 and ends on Wednesday at 23:59
+- Iterations apply to Tasks only
 
 ## Tooling & Workflow
 
-Language & Environment
-- Python 3.x
-- TODO: venv or conda for environment isolation
-- TODO: requirements.txt or environment.yml
-- Jupyter Notebooks
-- Git + GitHub
-- Mastery+
-  - Makerfile / Task Runner
-  - Deterministic environment locking
-  - Script-based pipeline modules
-  - CI (i.e., GitHub Actions)
-  - Parameterized notebooks
-  - Docker
-  - Interactive Dashboard / app
-  - Multi-omics integration
+### Language & Environment
 
-Repo Structure
+- **Python 3.x**
+- **Conda**, for environment and dependency management
+- **Jupyter Notebooks**, for exploratory and analytical work
+- **Git + GitHub**, for version control, and project management
 
-```
+The following are planned for upgrades/improvements if time allows:
+
+- Makerfile / Task Runner
+- Deterministic environment locking
+- Script-based pipeline modules
+- CI (i.e., GitHub Actions)
+- Parameterized notebooks
+- Docker
+- Interactive Dashboard / app
+- Multi-omics integration
+
+### Repo Structure
+
+Not all files/folders are included, only those that may be noteworthy to explore or need to be known about.
+
+```plain
 /
-├── README.md
-├── requirements.txt
-├── notebooks/
-│   └── iteration_1.ipynb
-├── data/
-│   ├── raw/
-│   └── processed/
-└── docs/
+├── data/                     # 
+│   ├── raw/                  # Immutable raw data from the original source
+│   └── processed/            # Cleaned, transformed, or derived datasets
+├── docs/                     # Project documentation and governance artifacts
+├── notebooks/                # Jupyter notebooks
+├── src/                      # Lightweight helpers
+├── environment.yml           # Python/Conda environment and dependency definitions
+└── README.md                 # Overview document - great place to start
 ```
-
-TODO: Describe folders/files
-
-
-

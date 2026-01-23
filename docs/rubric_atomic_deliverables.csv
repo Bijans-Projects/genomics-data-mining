@@ -1,0 +1,93 @@
+﻿Deliverable ID,Skill #,Skill Name,Level,Atomic Deliverable
+S1-P-01,1,Data Acquisition,Proficient,Acquires relevant data correctly (with minor issues)
+S1-P-02,1,Data Acquisition,Proficient,Imports data into R/Python correctly (with minor issues)
+S1-P-03,1,Data Acquisition,Proficient,Demonstrates general understanding of data structures used
+S1-P-04,1,Data Acquisition,Proficient,Demonstrates general understanding of data objects used
+S1-M-01,1,Data Acquisition,Mastery,Selects appropriate data sources
+S1-M-02,1,Data Acquisition,Mastery,Acquires data correctly without error
+S1-M-03,1,Data Acquisition,Mastery,Imports data into R/Python without error
+S1-M-04,1,Data Acquisition,Mastery,Clearly explains data formats
+S1-M-05,1,Data Acquisition,Mastery,Clearly explains data structures
+S1-M-06,1,Data Acquisition,Mastery,Clearly explains data objects used
+S2-P-01,2,Data Understanding,Proficient,Correctly explains what the variables represent
+S2-P-02,2,Data Understanding,Proficient,Correctly explains the data context
+S2-P-03,2,Data Understanding,Proficient,Identifies major limitations of the dataset
+S2-P-04,2,Data Understanding,Proficient,Generally considers data limitations during analysis
+S2-M-01,2,Data Understanding,Mastery,Accurately explains data provenance
+S2-M-02,2,Data Understanding,Mastery,Accurately explains variable meanings
+S2-M-03,2,Data Understanding,Mastery,Clearly identifies underlying assumptions
+S2-M-04,2,Data Understanding,Mastery,Clearly identifies data limitations
+S2-M-05,2,Data Understanding,Mastery,Incorporates assumptions into analysis decisions
+S2-M-06,2,Data Understanding,Mastery,Incorporates limitations into visualization decisions
+S3-P-01,3,Data Cleaning,Proficient,Identifies common data quality issues
+S3-P-02,3,Data Cleaning,Proficient,Addresses missing values appropriately
+S3-P-03,3,Data Cleaning,Proficient,Addresses inconsistencies appropriately
+S3-P-04,3,Data Cleaning,Proficient,Addresses outliers or errors appropriately
+S3-P-05,3,Data Cleaning,Proficient,Provides mostly reasonable justification for cleaning decisions
+S3-M-01,3,Data Cleaning,Mastery,Systematically identifies relevant data quality issues
+S3-M-02,3,Data Cleaning,Mastery,Resolves missing values using justified methods
+S3-M-03,3,Data Cleaning,Mastery,Resolves inconsistencies using justified methods
+S3-M-04,3,Data Cleaning,Mastery,Resolves outliers or errors using justified methods
+S3-M-05,3,Data Cleaning,Mastery,Documents cleaning steps transparently
+S3-M-06,3,Data Cleaning,Mastery,Provides clear justification for each cleaning decision
+S4-P-01,4,Exploratory Data Analysis,Proficient,Uses standard summary statistics
+S4-P-02,4,Exploratory Data Analysis,Proficient,Uses standard visualizations
+S4-P-03,4,Exploratory Data Analysis,Proficient,Identifies main features of the data
+S4-P-04,4,Exploratory Data Analysis,Proficient,Identifies key relationships in the data
+S4-M-01,4,Exploratory Data Analysis,Mastery,Conducts systematic exploratory analysis
+S4-M-02,4,Exploratory Data Analysis,Mastery,Uses multiple appropriate summaries
+S4-M-03,4,Exploratory Data Analysis,Mastery,Uses multiple appropriate visualizations
+S4-M-04,4,Exploratory Data Analysis,Mastery,Reveals patterns in the data
+S4-M-05,4,Exploratory Data Analysis,Mastery,Reveals relationships in the data
+S4-M-06,4,Exploratory Data Analysis,Mastery,Reveals anomalies in the data
+S5-P-01,5,Dimension Reduction,Proficient,Applies dimension-reduction techniques correctly
+S5-P-02,5,Dimension Reduction,Proficient,Produces reduced-dimension representations
+S5-P-03,5,Dimension Reduction,Proficient,Provides reasonable interpretation of reduced results
+S5-M-01,5,Dimension Reduction,Mastery,Selects appropriate dimension-reduction methods
+S5-M-02,5,Dimension Reduction,Mastery,Justifies choice of dimension-reduction method
+S5-M-03,5,Dimension Reduction,Mastery,Correctly applies the chosen method
+S5-M-04,5,Dimension Reduction,Mastery,Accurately interprets reduced dimensions
+S5-M-05,5,Dimension Reduction,Mastery,Relates reduced dimensions back to original variables
+S6-P-01,6,Statistical Modelling,Proficient,Selects a suitable statistical model
+S6-P-02,6,Statistical Modelling,Proficient,Fits the statistical model correctly
+S6-P-03,6,Statistical Modelling,Proficient,Interprets model outputs correctly
+S6-P-04,6,Statistical Modelling,Proficient,Provides limited assessment of model assumptions
+S6-M-01,6,Statistical Modelling,Mastery,Selects appropriate statistical models
+S6-M-02,6,Statistical Modelling,Mastery,Justifies model choice
+S6-M-03,6,Statistical Modelling,Mastery,Fits the model correctly
+S6-M-04,6,Statistical Modelling,Mastery,Checks key model assumptions
+S6-M-05,6,Statistical Modelling,Mastery,Assesses model fit
+S6-M-06,6,Statistical Modelling,Mastery,Clearly interprets results in context
+S7-P-01,7,Statistical Reasoning & Interpretation,Proficient,Correctly interprets most statistical quantities
+S7-P-02,7,Statistical Reasoning & Interpretation,Proficient,Correctly interprets trends shown in the data
+S7-P-03,7,Statistical Reasoning & Interpretation,Proficient,Correctly interprets variability shown in the data
+S7-P-04,7,Statistical Reasoning & Interpretation,Proficient,Demonstrates only minor omissions or imprecision
+S7-M-01,7,Statistical Reasoning & Interpretation,Mastery,Accurately interprets statistical summaries
+S7-M-02,7,Statistical Reasoning & Interpretation,Mastery,Accurately interprets trends
+S7-M-03,7,Statistical Reasoning & Interpretation,Mastery,Accurately interprets variability
+S7-M-04,7,Statistical Reasoning & Interpretation,Mastery,Accurately interprets uncertainty
+S7-M-05,7,Statistical Reasoning & Interpretation,Mastery,Clearly communicates implications of statistical results
+S8-P-01,8,Analytical Question Formulation,Proficient,Poses a clear analytical question
+S8-P-02,8,Analytical Question Formulation,Proficient,Ensures the question is relevant to the data
+S8-P-03,8,Analytical Question Formulation,Proficient,Ensures the question can be addressed with available data
+S8-M-01,8,Analytical Question Formulation,Mastery,Formulates a clear analytical question
+S8-M-02,8,Analytical Question Formulation,Mastery,Formulates an insightful analytical question
+S8-M-03,8,Analytical Question Formulation,Mastery,Ensures the question is answerable
+S8-M-04,8,Analytical Question Formulation,Mastery,Aligns the question with the data
+S8-M-05,8,Analytical Question Formulation,Mastery,Aligns the question with the analysis methods
+S9-P-01,9,Reproducibility & Professional Practice,Proficient,Produces an analysis that is mostly reproducible
+S9-P-02,9,Reproducibility & Professional Practice,Proficient,Organizes code and outputs coherently
+S9-P-03,9,Reproducibility & Professional Practice,Proficient,Includes documentation with minor gaps
+S9-M-01,9,Reproducibility & Professional Practice,Mastery,Produces a fully reproducible analysis
+S9-M-02,9,Reproducibility & Professional Practice,Mastery,Organizes code and outputs clearly
+S9-M-03,9,Reproducibility & Professional Practice,Mastery,"Documents code, workflows, and outputs thoroughly"
+S9-M-04,9,Reproducibility & Professional Practice,Mastery,Follows professional analysis standards
+S10-P-01,10,Communication & Storytelling with Data,Proficient,Communicates results clearly
+S10-P-02,10,Communication & Storytelling with Data,Proficient,Uses appropriate visuals
+S10-P-03,10,Communication & Storytelling with Data,Proficient,Provides appropriate explanations of results
+S10-M-01,10,Communication & Storytelling with Data,Mastery,Communicates findings clearly
+S10-M-02,10,Communication & Storytelling with Data,Mastery,Communicates findings compellingly
+S10-M-03,10,Communication & Storytelling with Data,Mastery,Uses effective narrative structure
+S10-M-04,10,Communication & Storytelling with Data,Mastery,Uses visuals deliberately
+S10-M-05,10,Communication & Storytelling with Data,Mastery,Uses annotations to emphasize key points
+S10-M-06,10,Communication & Storytelling with Data,Mastery,Tailors communication to the target audience
