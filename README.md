@@ -39,34 +39,59 @@ TODO: Mermaid chart rubric --> epics --> tasks --> evidence
 
 ### Milestones  |  Semantic Versioning
 
-TODO: Insert mermaid chart ... I'm thinking the GitGraph, where the main should be major versions (with a tag for the major version number.... But, I think I would really like something that highlights two things: the major deliverables highlighted (also still showing the minor ones), and most importantly the dates (and because they are dates, they should kind of be reflective of how long each period is between expected deliverable). 
-
-Milestone dates should be for 23:59 of that day (which should align with the end of an iteration). 
-
-temp mermaid chart
 ```mermaid
 gantt
-    title Project Milestones Timeline
-    dateFormat  YYYY-MM-DD
-    axisFormat  %b %d
+    title Genomics Project Plan
+    dateFormat YYYY-MM-DD
+    axisFormat %a %b %d
+    tickInterval 1week
+    weekday monday
+    excludes weekends, 2026-02-16, 2026-02-17, 2026-02-18, 2026-02-19, 2026-02-20
 
-    section Phases
-    Initialization (v0.x)   :active, 2026-01-21, 2026-01-28
-    Proposal Phase (v1.x)   :2026-01-29, 2026-02-25
-    Analysis Phase (v2.x)   :2026-02-26, 2026-03-11
-    Finalization (v3.x)     :2026-03-12, 2026-04-01
 
-    section Major Deliverables
-    ★ v1.0.0 Proposal Submitted      :milestone, 2026-02-04, 0d
-    ★ v2.0.0 Proposal Finalized      :milestone, 2026-02-25, 0d
-    ★ v3.0.0 Final Project Submitted :milestone, 2026-04-01, 0d
 
-    section Status Reports
-    v0.1.0 Report 1 :milestone, 2026-01-28, 0d
-    v1.1.0 Report 2 :milestone, 2026-02-11, 0d
-    v2.1.0 Report 3 :milestone, 2026-03-04, 0d
-    v2.2.0 Report 4 :milestone, 2026-03-11, 0d
+    Initialization          :active,      v0,           2026-01-21,    2026-01-29
+    Status Update Report    :milestone,   msur1,        2026-01-29,    0d
+
+    Proposal Phase          :             v1,           2026-01-29,    2026-02-26
+  %%Proposal Submitted      :milestone,   mv1,          2026-02-04,    0d
+    Proposal Submitted      :vert,        vv1,          2026-02-05,    0d
+    Status Update Report    :milestone,   msur2,        2026-02-12,    0d
+    Reading Week            :             off1,         2026-02-16,    2026-02-21
+  %%Proposal Finalized      :milestone,   mv2,          2026-02-25,    0d
+    Proposal Finalized      :vert,        vv2,          2026-02-26,    0d
+    
+    Analysis Phase          :             v2,           after v1,      2026-03-12
+    Status Update Report    :milestone,   msur3,        2026-03-05,    0d
+    Status Update Report    :milestone,   msur4,        2026-03-12,    0d
+    
+    Finalization Phase      :             v3,           after v2,      2026-04-02
+  %%Final Project Submitted :milestone,   mv3,          2026-04-01,    0d
+    Final Project Submitted :vert,        vv3,          2026-04-02,    0d
 ```
+
+#### Phases 
+
+| Phase | Start Date | Start Time | End Date | End Time |
+| -----| -------------| ---------- | ---------- | -------- |
+| Initialization | Thursday, January 22, 2026 | 00:00 | Wednesday, January 28, 2026 | 23:59 |
+| Proposal | Thursday, January 29, 2026 | 00:00 | Wednesday, February 25, 2026 | 23:59 |
+| Analysis | Thursday, February 26, 2026 | 00:00 | Wednesday, March 11, 2026 | 23:59 |
+| Finalization | Thursday, March 12, 2026 | 00:00 | Wednesday, April 01, 2026 | 23:59 |
+
+#### Milestones
+
+| Milestone | Version | Date | Time |
+| --------- | ------- | ---- | ---- |
+| Status Update 1 | v0.1 | Wednesday, January 28, 2026 | 23:59 |
+| Proposal Submitted | v1 | Wednesday, February 04, 2026 | 23:59 |
+| Status Update 2 | v1.1 | Wednesday, February 11, 2026 | 23:59 |
+| Proposal Finalized | v2 | Wednesday, February 25, 2026 | 23:59 |
+| Status Update 3 | v2.1 | Wednesday, March 04, 2026 | 23:59 |
+| Status Update 4 | v2.2 | Wednesday, March 11, 2026 | 23:59 |
+| Final Project Submitted | v3 | Wednesday, April 01, 2026 | 23:59 |
+
+The date-time represents when the version begins, and is always marked by the release of the specific milestone evidence. 
 
 ### Iterationas
 
