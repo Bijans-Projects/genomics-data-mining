@@ -1,0 +1,1 @@
+TODO: expalin what goes in raw/ vs processed/. What is ignored by git, and how to obtain the raw tarball. 

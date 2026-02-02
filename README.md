@@ -164,9 +164,12 @@ Project work is organized into weekly plans, called Iterations. They are managed
 
 ### Language & Environment
 
+> [!NOTE]
+> Python and R are managed by Conda, see environment.yml for details
+
 - **Python 3.x**
-- **Conda**, for environment and dependency management
-- **Jupyter Notebooks**, for exploratory and analytical work
+- **Conda**, for environment and dependency management (NOTE: Installed Anaconda Distribution, not Miniconda see [Getting started with conda](https://docs.conda.io/projects/conda/en/stable/user-guide/getting-started.html))
+  - **Jupyter Notebooks**, for exploratory and analytical work
 - **Git + GitHub**, for version control, and project management
 
 The following are planned for upgrades/improvements if time allows:
@@ -174,7 +177,7 @@ The following are planned for upgrades/improvements if time allows:
 - Makerfile / Task Runner
 - Deterministic environment locking
 - Script-based pipeline modules
-- CI (i.e., GitHub Actions)
+- Continuous Integration (CI; i.e., GitHub Actions)
 - Parameterized notebooks
 - Docker
 - Interactive Dashboard / app
@@ -182,13 +185,14 @@ The following are planned for upgrades/improvements if time allows:
 
 ### Repo Structure
 
-Not all files/folders are included, only those that may be noteworthy to explore or need to be known about.
+> [!NOTE]
+> Not all files/folders are listed here, only those that may be noteworthy to explore, or those that have specific meaning/importance to this repo (i.e., not easily Google-able)
 
 ```plain
 /
 ├── data/                     # 
-│   ├── raw/                  # Immutable raw data from the original source
-│   └── processed/            # Cleaned, transformed, or derived datasets
+│   ├── processed/            # Cleaned, transformed, or derived datasets
+│   └── raw/                  # Immutable raw data from the original source
 ├── docs/                     # Project documentation and governance artifacts
 ├── notebooks/                # Jupyter notebooks
 ├── src/                      # Lightweight helpers

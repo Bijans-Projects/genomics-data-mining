@@ -1,0 +1,15 @@
+name: genomics-mining
+channels:
+  - conda-forge
+dependencies:
+  - python=3.14.2
+  - numpy=2.4.1
+  - pandas=2.3.3
+  - scipy=1.16.3
+  - scikit-learn=1.8.0
+  - matplotlib=3.10.8
+  - seaborn=0.13.2
+  - jupyterlab=4.5.0
+  - ipykernel=6.31.0
+  - requests=2.32.5
+  - pip=25.3
