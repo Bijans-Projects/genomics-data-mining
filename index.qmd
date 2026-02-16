@@ -1,0 +1,1060 @@
+---
+title: Genomics Data Mining Notebook
+---
+
+
+
+## Setup
+
+```{ojs}
+//| label: section-div-01
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div class="current">Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+Establishing a reproducible analysis environment.
+
+```{python}
+#| label: analyze-setup-debugger
+#| eval: false
+#| output: false
+
+# Used if needed to debut environment issues
+
+import sys, os, site
+print("exe:", sys.executable)
+print("ver:", sys.version)
+print("prefix:", sys.prefix)
+print("base_prefix:", sys.base_prefix)
+print("cwd:", os.getcwd())
+print("usersite:", site.getusersitepackages())
+
+
+for k in ["PYTHONHOME", "PYTHONPATH", "CONDA_PREFIX", "VIRTUAL_ENV"]:
+    print(k, "=", os.environ.get(k))
+
+```
+
+### Package Imports
+
+```{python}
+#| label: analyze-setup-packages
+#| eval: true
+#| output: false
+
+# --- Standard library ---
+import importlib.metadata
+import importlib
+import json
+import os
+import platform
+import random
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+from pathlib import Path
+from urllib.parse import urlsplit
+
+# --- Third-party ---
+import itables
+import numpy as np
+import pandas as pd
+import requests
+import sklearn
+import yaml
+from IPython.display import Markdown, display
+from ydata_profiling import ProfileReport
+
+# --- Currently Testing ---
+import time
+import cbioportal
+from cbioportal.rest import ApiException
+from pprint import pprint
+
+# --- Local / project ---
+import config
+
+importlib.reload(config)
+```
+
+### Custom Objects
+```{python}
+#| label: analyze-setup-custom-objects
+#| eval: true
+#| output: false
+
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict
+
+@dataclass
+class CancerStudy:
+    # Core identity
+    study_id: str
+    study_name: str
+    description: Optional[str]
+
+    # Cancer classification
+    cancer_type_id: Optional[str]
+    cancer_type_name: Optional[str]
+
+    # Clinical summary
+    sample_count: Optional[int] = None
+    patient_count: Optional[int] = None
+
+    # Data modalities present
+    data_types: List[str] = field(default_factory=list)
+
+    # Provenance
+    reference: Optional[str] = None
+    citation: Optional[str] = None
+    pmid: Optional[str] = None
+
+    # Internal / system metadata
+    source_url: Optional[str] = None
+    raw_meta: Dict[str, str] = field(default_factory=dict)
+
+```
+
+### Parameters
+
+:::{.callout-important}
+
+Most parameters are defined in the config.py file, and will eventually be part of environment variables
+
+:::
+
+```{python}
+#| label: analyze-setup-parameters
+#| eval: true
+#| output: true
+
+# Parameters
+RANDOM_SEED = 3660
+```
+
+### Package Defaults / Options
+
+```{python}
+#| label: analyze-setup-package-options
+#| eval: true
+#| output: false
+
+# ITables
+# itables.init_notebook_mode()
+
+# Pandas
+pd.set_option("display.max_rows", 30)
+pd.set_option("display.max_columns", 50)
+pd.set_option("display.width", 120)
+pd.set_option("display.max_colwidth", 60)
+
+# Randomness
+os.environ["PYTHONHASHSEED"] = str(RANDOM_SEED)
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+# Note for later:
+# - use random_state=RANDOM_SEED in sklearn models
+# - TSNE(random_state=RANDOM_SEED)
+# - train_test_split(..., random_state=RANDOM_SEED)
+
+# Others 
+# ...
+```
+
+### Helper Functions
+
+```{python}
+#| label: analyze-setup-helper-functions
+#| eval: true
+#| output: false
+
+def download_and_extract_studies(*study_ids: str) -> list[Path]:
+    return [_download_and_extract_study(study) for study in study_ids]
+
+def _download_and_extract_study(study_id: str):
+    url = f"{config.DATAHUB_BASE}/{study_id}.tar.gz"
+    dataset_file = download_dataset(url)
+    dataset_path = extract_dataset(dataset_file)
+    return dataset_path
+
+def download_dataset(url, /, *, folder: Path = config.DEFAULT_DATASET_DOWNLOAD_FOLDER, force: bool = False) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    
+    filename = Path(urlsplit(url).path).name
+    target = folder / filename
+
+    if force or not target.exists():
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        
+        with target.open("wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        
+    return target
+
+def extract_dataset(file: Path, /, *, folder: Path = config.DEFAULT_DATASET_EXTRACT_FOLDER, force: bool = False) -> Path:
+    base_name = file.name.removesuffix(".tar.gz")
+    extract_path = folder / base_name
+    
+    folder.mkdir(parents=True, exist_ok=True)
+
+    if force or not extract_path.exists():
+        with tarfile.open(file, "r:gz") as tar:
+            tar.extractall(folder)
+
+    return extract_path
+
+```
+
+### Environment
+
+Checks
+
+```{python}
+#| label: analyze-setup-environment
+#| eval: true
+#| display: false
+
+# ---------- helpers ----------
+
+def _run(cmd: list[str]) -> tuple[int, str, str]:
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+def _canonical(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower().strip()
+
+def read_environment_yml(path: str | Path = "environment.yml"):
+    """
+    Parse environment.yml into:
+      - conda_chosen: conda deps declared in environment.yml (name -> version/constraint/None)
+      - pip_chosen: pip deps declared under `- pip:` in environment.yml (name -> version/constraint/None)
+    Notes:
+      - Handles conda pins like `name`, `name=ver`, `name=ver=build`
+      - Handles constraints like `python>=3.11`, `numpy<2`
+      - Normalizes accidental leading '=' in version strings (e.g., '=1.2.3')
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    conda_chosen: dict[str, str | None] = {}
+    pip_chosen: dict[str, str | None] = {}
+
+    deps = data.get("dependencies", []) or []
+    for dep in deps:
+        if isinstance(dep, str):
+            s = dep.strip()
+            if not s:
+                continue
+
+            # constraint case: python>=3.11, numpy<2, etc.
+            m = re.match(r"^([A-Za-z0-9_.-]+)\s*([<>=!~].+)$", s)
+            if m:
+                conda_chosen[_canonical(m.group(1))] = m.group(2).strip()
+                continue
+
+            # conda pins can be: name, name=ver, name=ver=build
+            parts = s.split("=")
+            name = _canonical(parts[0])
+            ver = parts[1] if len(parts) >= 2 else None
+            if ver is not None:
+                ver = ver.strip()
+                if ver.startswith("=") and not ver.startswith("=="):
+                    ver = ver.lstrip("=")
+            conda_chosen[name] = ver
+
+        elif isinstance(dep, dict) and "pip" in dep:
+            for p in dep.get("pip", []) or []:
+                ps = str(p).strip()
+                if not ps:
+                    continue
+                if "==" in ps:
+                    pkg, ver = ps.split("==", 1)
+                    pip_chosen[_canonical(pkg)] = ver.strip()
+                else:
+                    # store non-exact constraint as-is (>=, <=, ~=, etc.)
+                    pkg = re.split(r"[<>=!~]", ps, maxsplit=1)[0].strip()
+                    constraint = ps[len(pkg):].strip() or None
+                    pip_chosen[_canonical(pkg)] = constraint
+
+    return data, conda_chosen, pip_chosen
+
+
+def _conda_cmd() -> list[str] | None:
+    """
+    Find conda.exe even when it's not on PATH (common for notebooks on Windows).
+
+    Priority:
+      1) CONDA_EXE env var (if set)
+      2) PATH lookup (shutil.which("conda"))
+      3) Derive from CONDA_PREFIX (Windows Anaconda layout):
+         CONDA_PREFIX = ...\\anaconda3\\envs\\<env>
+         conda.exe    = ...\\anaconda3\\Scripts\\conda.exe
+    """
+    # 1) explicit env var (often not set in notebooks)
+    conda_exe = os.getenv("CONDA_EXE")
+    if conda_exe and Path(conda_exe).exists():
+        return [conda_exe]
+
+    # 2) PATH lookup
+    which = shutil.which("conda")
+    if which:
+        return [which]
+
+    # 3) derive from CONDA_PREFIX on Windows
+    conda_prefix = os.getenv("CONDA_PREFIX")
+    if conda_prefix:
+        p = Path(conda_prefix)
+        # Typical: .../anaconda3/envs/<env> -> base is parent of "envs"
+        if p.parent.name.lower() == "envs":
+            base = p.parents[1]
+        else:
+            # Sometimes CONDA_PREFIX might be the base env itself
+            base = p
+        candidate = base / "Scripts" / "conda.exe"
+        if candidate.exists():
+            return [str(candidate)]
+
+    return None
+
+
+def conda_available() -> bool:
+    cmd = _conda_cmd()
+    if not cmd:
+        return False
+    try:
+        subprocess.run(cmd + ["--version"], capture_output=True, text=True, check=True)
+        return True
+    except Exception:
+        return False
+
+
+def get_conda_installed_versions_strict() -> dict[str, str]:
+    """
+    Returns name->version from `conda list --json`.
+
+    Raises a helpful error if conda cannot be found or if the command fails.
+    """
+    cmd = _conda_cmd()
+    if not cmd:
+        raise FileNotFoundError(
+            "Could not find conda executable (CONDA_EXE not set, conda not on PATH, "
+            "and could not derive conda.exe from CONDA_PREFIX)."
+        )
+
+    proc = subprocess.run(cmd + ["list", "--json"], capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"conda list failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
+
+    items = json.loads(proc.stdout)
+    out: dict[str, str] = {}
+    for it in items:
+        name = (it.get("name") or "").strip().lower()
+        ver = (it.get("version") or "").strip()
+        if name and ver:
+            out[name] = ver
+
+    # reflect the running interpreter's python version (helps with "custom interpreter" reality)
+    out["python"] = sys.version.split()[0]
+    return out
+
+
+def get_conda_chosen_from_history() -> dict[str, str | None]:
+    """
+    What YOU asked conda for (closest proxy for 'every install command I sent'):
+    `conda env export --from-history`
+    """
+    cmd = _conda_cmd()
+    if not cmd:
+        return {}
+
+    proc = subprocess.run(cmd + ["env", "export", "--from-history"], capture_output=True, text=True, check=True)
+    data = yaml.safe_load(proc.stdout) or {}
+    deps = data.get("dependencies", []) or []
+
+    chosen: dict[str, str | None] = {}
+    for dep in deps:
+        if isinstance(dep, str):
+            s = dep.strip()
+            if not s:
+                continue
+            parts = s.split("=")
+            name = parts[0].strip().lower()
+            ver = parts[1].strip().lstrip("=") if len(parts) >= 2 else None
+            chosen[name] = ver
+    return chosen
+
+
+def get_pip_installed_all() -> dict[str, str]:
+    """
+    pip list as json; best effort even inside conda env.
+    """
+    rc, out, err = _run([sys.executable, "-m", "pip", "list", "--format=json"])
+    if rc != 0:
+        return {}
+    items = json.loads(out)
+    return {_canonical(it["name"]): it["version"] for it in items}
+
+
+def version_status(expected: str | None, installed: str | None) -> str:
+    if installed is None:
+        return "MISSING"
+    if expected is None:
+        return "OK (un-pinned)"
+
+    expected = expected.strip()
+
+    # Treat "=1.2.3" as an exact pin (common accidental format)
+    if expected.startswith("=") and not expected.startswith("=="):
+        expected = expected.lstrip("=")
+
+    # True constraints (>=, <=, ==, ~=, etc.)
+    if expected and expected[0] in "<>!~" or expected.startswith("=="):
+        return "CHECK (constraint)"
+
+    if expected.endswith(".*"):
+        return "OK" if installed.startswith(expected[:-1]) else "MISMATCH"
+
+    return "OK" if installed == expected else "MISMATCH"
+
+
+
+# ---------- run ----------
+
+env_data, yml_conda_chosen, yml_pip_chosen = read_environment_yml("environment.yml")
+
+# Capture interpreter details (your "custom interpreter" concern)
+interpreter_rows = [
+    {"Key": "sys.executable", "Value": sys.executable},
+    {"Key": "sys.version", "Value": sys.version},
+]
+if os.getenv("CONDA_PREFIX"):
+    interpreter_rows.append({"Key": "CONDA_PREFIX", "Value": os.getenv("CONDA_PREFIX")})
+df_interpreter = pd.DataFrame(interpreter_rows)
+display(df_interpreter)
+
+# Get actuals
+try:
+    conda_installed = get_conda_installed_versions_strict() if conda_available() else {}
+except Exception as e:
+    print("⚠️ Could not read conda installed packages:", e)
+    conda_installed = {}
+
+conda_history_chosen = get_conda_chosen_from_history() if conda_available() else {}
+pip_installed = get_pip_installed_all()
+
+rows: list[dict] = []
+
+def add_manager_rows(
+    manager: str,
+    chosen_map: dict[str, str | None],
+    installed_versions: dict[str, str],
+):
+    chosen_set = set(chosen_map.keys())
+
+    # chosen packages (source of truth = environment.yml)
+    for pkg in sorted(chosen_map.keys()):
+        exp = chosen_map[pkg]
+        got = installed_versions.get(pkg)
+        status = version_status(exp, got)
+        rows.append({
+            "Manager": manager,
+            "Package": pkg,
+            "Chosen?": True,
+            "Expected (environment.yml)": exp if exp is not None else "(un-pinned)",
+            "Installed": got if got is not None else "(not installed)",
+            "Status": status,
+        })
+
+    # dependencies (installed but not chosen)
+    for pkg in sorted(set(installed_versions.keys()) - chosen_set):
+        got = installed_versions.get(pkg)
+        rows.append({
+            "Manager": manager,
+            "Package": pkg,
+            "Chosen?": False,
+            "Expected (environment.yml)": "(dependency)",
+            "Installed": got,
+            "Status": "INFO (dependency)",
+        })
+
+# Conda & Pip rows
+add_manager_rows("conda", yml_conda_chosen, conda_installed)
+add_manager_rows("pip", yml_pip_chosen, pip_installed)
+
+df = pd.DataFrame(rows)
+
+# Helpful sorting: chosen first, then manager, then package
+df = df.sort_values(by=["Chosen?", "Manager", "Package"], ascending=[False, True, True]).reset_index(drop=True)
+display(df)
+
+# Summary counts for quick signal
+summary = df.groupby(["Manager", "Status"]).size().reset_index(name="Count")
+display(summary)
+
+# Extra: show "explicit conda-history packages missing from environment.yml"
+extra_explicit = []
+if conda_history_chosen:
+    for pkg in sorted(set(conda_history_chosen.keys()) - set(yml_conda_chosen.keys())):
+        extra_explicit.append({
+            "Package": pkg,
+            "From conda history": conda_history_chosen[pkg],
+            "In environment.yml?": "NO",
+        })
+
+df_extra_explicit = pd.DataFrame(extra_explicit)
+if not df_extra_explicit.empty:
+    print("⚠️ Packages explicitly requested in this conda env (history) but missing from environment.yml:")
+    display(df_extra_explicit)
+else:
+    print("✅ No extra explicit conda-history packages missing from environment.yml (or conda history unavailable).")
+
+
+```
+
+
+
+
+
+## Data Acquisition
+
+```{ojs}
+//| label: section-div-02
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div class="current">Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+We use the cBioPortal to gather data about what is available. 
+
+### cBioPortal
+
+#### Cancer Types
+```{python}
+#| label: analyze-data-acquisition-cancer-types-api
+#| eval: true
+#| display: true
+
+# Cancer Types API
+cancer_types_api_config = cbioportal.Configuration()
+cancer_types_api_instance = cbioportal.CancerTypesApi(cbioportal.ApiClient(cancer_types_api_config))
+
+cbioportal_cancer_types = cancer_types_api_instance.get_all_cancer_types_using_get()
+cbioportal_cancer_types = pd.DataFrame([item.to_dict() for item in cbioportal_cancer_types])
+
+itables.show(
+    cbioportal_cancer_types
+)
+
+```
+
+#### Studies
+```{python}
+#| label: analyze-data-acquisition-studies-api
+#| eval: true
+#| display: true
+# Studies API
+studies_api_instance = cbioportal.StudiesApi()
+
+cbioportal_studies = studies_api_instance.get_all_studies_using_get()
+cbioportal_studies = pd.DataFrame([item.to_dict() for item in cbioportal_studies])
+
+itables.show(
+    cbioportal_studies
+)
+```
+
+#### Clinical Attributes
+```{python}
+#| label: analyze-data-acquisition-clinical-attributes-api
+#| eval: true
+#| display: true
+
+# Clinical Attributes API
+
+lgg_clinical_attributes = cbioportal.ClinicalAttributesApi().get_all_clinical_attributes_in_study_using_get('lgg_tcga_pan_can_atlas_2018')
+lgg_clinical_attributes = pd.DataFrame([item.to_dict() for item in lgg_clinical_attributes])
+
+itables.show(
+    lgg_clinical_attributes
+)
+
+```
+
+### Download and Extract
+
+The Brain Lower Grade Glioma (TCGA, PanCancer Atlas) dataset was obtained from the cBioPortal for Cancer Genomics. The dataset was downloaded as a compressed tarball containing clinical, molecular, and metadata files.
+
+**Dataset**: Brain Lower Grade Glioma (TCGA, PanCancer Atlas)  
+**Source**: https://www.cbioportal.org/  
+**File**: `lgg_tcga_pan_can_atlas_2018.tar.gz`
+
+```{python}
+#| label: analyze-data-acquisition-extract-package
+#| eval: true
+#| display: true
+
+study_paths = download_and_extract_studies(
+    "lgg_tcga_pan_can_atlas_2018",
+    "lgg_ucsf_2014"
+)
+study_paths
+
+```
+
+::: callout-note
+## cBioPortal Downloading
+
+There is extensive documentation for how to download from cBioPortal. This includes manually through the browser, or with an API. https://docs.cbioportal.org/downloads/
+
+:::
+
+### Data Loading
+
+Using information from the cBioPortal Summary tab and the downloaded data files, the following provides a high-level overview of the dataset, including patient counts, molecular data availability, mutation frequencies, and survival information.
+
+```{python}
+#| label: analyze-data-acquisition-loading-helper
+#| eval: true
+#| display: false
+
+
+
+def describe_dataframe_table(df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+
+    for col in df.columns:
+        s = df[col]
+
+        row = {
+            "Column Name": col,
+            "Column Type": str(s.dtype),
+            "Non-Null Count": s.notna().sum(),
+            "Missing Count": s.isna().sum(),
+        }
+
+        if pd.api.types.is_numeric_dtype(s):
+            row.update({
+                "Data Kind": "Numeric",
+                "Min": s.min(),
+                "Max": s.max(),
+                "Categories": None,
+            })
+        else:
+            row.update({
+                "Data Kind": "Categorical",
+                "Min": None,
+                "Max": None,
+                "Categories": ", ".join(map(str, s.dropna().unique()[:10])),
+            })
+
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+```
+
+:::: column-page
+::: panel-tabset
+## Patient
+
+```{python}
+#| label: analyze-data-acquisition-loading-patient
+#| eval: true
+#| display: true
+
+
+clinical_patient_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
+
+df_clinical_patients = pd.read_csv(clinical_patient_file, sep="\t", comment="#")
+
+described_df_clinical_patients = describe_dataframe_table(df_clinical_patients)
+
+
+itables.show(
+    described_df_clinical_patients,
+    paging=False,
+    text_in_header_can_be_selected=False,
+    columnControl=["order", "colVisDropdown", "searchDropdown"],
+    ordering={"indicators": False, "handler": False}
+)
+
+```
+
+## Clinical Sample
+
+```{python}
+#| label: analyze-data-acquisition-loading-clinical-sample
+#| eval: true
+#| display: true
+
+
+clinical_sample_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
+
+
+
+df_clinical_sample = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
+
+```
+
+## MRNA Seq
+
+```{python}
+#| label: analyze-data-acquisition-loading-mrna
+#| eval: true
+#| display: true
+
+mrna_seq_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_mrna_seq_v2_rsem.txt")
+
+
+df_mrna_seq = pd.read_csv(mrna_seq_file, sep="\t", comment="#")
+
+itables.show(
+    df_mrna_seq
+)
+
+# expr = df.iloc[:, 2:]
+
+# gene_summary = pd.DataFrame({
+#     "mean": expr.mean(axis=1),
+#     "median": expr.median(axis=1),
+#     "std": expr.std(axis=1),
+#     "variance": expr.var(axis=1),
+#     "nonzero_fraction": (expr > 0).mean(axis=1)
+# })
+
+# gene_summary.head()
+
+
+
+
+
+
+
+```
+
+:::
+::::
+
+### TODO: data_clinical_sample.txt
+
+### TODO: Summarize the 3 df's
+
+### TODO:
+
+Thesse are some words in this section
+
+
+
+## Data Understanding
+
+```{ojs}
+//| label: section-div-03
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div class="current">Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+## Data Cleaning
+
+```{ojs}
+//| label: section-div-04
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div class="current">Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+
+
+## Dimension Reduction
+
+```{ojs}
+//| label: section-div-05
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div">Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div class="current">Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+
+
+
+## Statistical Modelling
+
+```{ojs}
+//| label: section-div-06
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div class="current">Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+## Conclusions
+
+```{ojs}
+//| label: section-div-07
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div class="current">Conclusions</div>
+</div>
+`
+ 
+```
+
+
+
+
+
+🧬 From Shredded Spells to Gene Expression
+==========================================
+
+What We Actually Measured
+-------------------------
+
+### 🔍 The Crime Scene (Biological Reality)
+
+-   Tumor tissue contains RNA.
+
+-   RNA represents **which genes are actively being used**.
+
+-   We sequence millions of short fragments (reads).
+
+-   Each read is a tiny piece of a transcript.
+
+* * * * *
+
+📖 The Reconstruction
+---------------------
+
+We assume all fragments came from a known reference "book" (the human transcriptome).
+
+Using **RSEM (RNA-Seq by Expectation Maximization)**:
+
+-   Reads are probabilistically assigned to transcript isoforms.
+
+-   Isoform estimates are aggregated to gene-level estimates.
+
+-   Values are corrected for:
+
+    -   Gene length
+
+    -   Sequencing depth
+
+    -   Multi-mapping reads
+
+The result:
+
+> A gene-by-sample matrix of estimated transcript abundance.
+
+* * * * *
+
+📊 What Each Row Represents
+---------------------------
+
+**Hugo_Symbol**\
+The official gene name (e.g., TP53, IDH1).
+
+**Entrez_Gene_Id**\
+Stable numeric gene identifier (database key).
+
+Each row = one gene.\
+Each column = one tumor sample.\
+Each value = estimated mRNA abundance for that gene in that tumor.
+
+* * * * *
+
+📈 What the Numbers Mean
+------------------------
+
+-   Continuous
+
+-   Non-negative
+
+-   Linear RSEM abundance estimates
+
+-   Proportional to transcript abundance
+
+-   Not raw molecule counts
+
+-   Not mutation data
+
+-   Not protein levels
+
+If Gene A = 200 and Gene B = 100 (within a sample):
+
+→ Gene A has approximately twice the estimated transcript abundance of Gene B.
+
+But:
+
+Magnitude ≠ importance.
+
+* * * * *
+
+🧠 What Matters Most
+--------------------
+
+### 1️⃣ Same Gene Across Samples
+
+Biologically meaningful comparison.
+
+### 2️⃣ Variability Across Tumors
+
+High variance genes → informative\
+Low variance genes → housekeeping / background
+
+### 3️⃣ Expression ≠ Genome
+
+We measured gene **expression**, not gene presence or mutation.
+
+* * * * *
+
+🧬 Key Vocabulary
+-----------------
+
+-   **Gene** -- DNA locus that produces RNA.
+
+-   **Isoform** -- Alternative transcript version of a gene.
+
+-   **Transcriptome** -- Total RNA expression profile of a sample.
+
+-   **RSEM** -- Probabilistic transcript quantification method.
+
+-   **Expected Counts** -- Model-based abundance estimates.
+
+-   **Normalization** -- Adjusting for technical bias (not biological baseline).
+
+-   **Variance** -- Spread across samples; often more informative than raw magnitude.
+
+* * * * *
+
+🎭 The Big Insight
+------------------
+
+Each tumor is not just a disease.
+
+It is:
+
+> A 20,531-dimensional expression profile\
+> describing which biological programs are active.
+
+We reconstructed the "spellbook."
+
+But the real story lives in:
+
+-   Which chapters change.
+
+-   Which remain constant.
+
+-   And how patterns emerge across tumors.
+
+* * * * *
+
+⚠️ The Important Limitation
+---------------------------
+
+Expression data tells us:
+
+-   What instructions are active.
+
+It does NOT tell us:
+
+-   Why they're active.
+
+-   Whether they're mutated.
+
+-   Whether protein levels match.
+
+-   Whether the change is causal.
+
+This is one layer of biology.
+
+* * * * *
+
+🔥 Final Line for Class
+-----------------------
+
+> "We didn't count genes.\
+> We counted how loudly each gene was being read.\
+> And in that noise... the pattern begins to whisper."

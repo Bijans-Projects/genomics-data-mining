@@ -1,8 +1,13 @@
-# External data sources (downloaded and extracted)
-data/external
+# Data Directories (ignore contents)
+data/external/*
+data/interim/*
+data/raw/*
 
-# Interim data
-data/interim
+# Data Keep
+!data/external/README.md
+!data/interim/README.md
+!data/raw/README.md
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -188,9 +193,9 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#  and can be added to the global gitignore or merged into this file. However, if you prefer,
 #  you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 
@@ -214,3 +219,6 @@ __marimo__/
 
 # Keep folder structure in git
 !.gitkeep
+/env/
+/.quarto/
+**/*.quarto_ipynb

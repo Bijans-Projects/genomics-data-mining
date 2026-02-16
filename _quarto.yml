@@ -1,0 +1,24 @@
+project:
+  type: website
+  output-dir: docs
+  preview:
+    port: 4200
+    browser: true
+  render:
+    - index.qmd
+
+website:
+  title: "quarto"
+  navbar:
+    left:
+      - index.qmd
+
+jupyter: genomics-data-mining
+
+format:
+  html:
+    theme:
+      - cosmo
+      - brand
+    css: styles.css
+    toc: true
