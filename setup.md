@@ -1,29 +1,15 @@
 # Setup
 
-## Create environment
+From the root directory run the following commands: 
 
-From the root directory run the following command:
-
-```powershell
-conda env create --prefix .\env -file environment.yml --use-local
-```
-
-## Activate
+1. Build the custom Conda packages
 
 ```powershell
+conda build .\packages\cbioportal_python_client\ --output-folder .\conda-channel\
+conda index .\conda-channel\
+conda env create --prefix .\env --file environment.yml
 conda activate .\env
-```
-
-## Register kernel for Jupyter
-
-```powershell
 python -m ipykernel install --user --name genomics-data-mining --display-name "Python (Conda: -p .\env genomics-data-mining)"
-```
-
-## If you're updating the environment.yml
-
-```powershell
-conda env update --file environment.yml --prune --use-local
 ```
 
 ## Optional
@@ -34,6 +20,14 @@ If you don't like that the shell has the full path of the environment, update yo
 conda config --set env_prompt '({name})'
 ```
 
-## Launch Jupyter
+## Reset
 
-## jupyter lab
+```powershell
+conda remove --prefix .\env --all
+```
+
+## Updates
+
+```powershell
+conda env update --file environment.yml --prune --use-local
+```

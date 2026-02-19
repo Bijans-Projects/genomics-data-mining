@@ -1,23 +1,24 @@
 name: genomics-data-mining
 channels:
+  - ./conda-channel
   - conda-forge
   - nodefaults
 dependencies:
   - python
   - ipykernel
+  - ipywidgets
+  - itables
   - jupyterlab
-  - pandas
   - matplotlib
   - numpy
+  - openlineage-python
+  - pandas
   - pyyaml
   - requests
   - scikit-learn
   - scipy
   - seaborn
-  - ydata-profiling
-  - itables
-  - ipywidgets
   - setuptools<=81
-  - openlineage-python
+  - ydata-profiling
   - cbioportal
-prefix: .\env
+prefix: ./env

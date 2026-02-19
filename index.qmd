@@ -1,6 +1,47 @@
 ---
-title: Genomics Data Mining Notebook
+title: Genomics Data Mining
 ---
+
+## Expectations
+
+TECHNNICAL
+
+We expect a basic understanding of programming (we use Python, but any programming language will do).
+Only functions that are created within this project will have documentation, otherwise you are expected to be able to read and understand what they are doing through their own official documentation.
+
+BIOLOGY
+
+We are only looking at human biology, and expect you to know at least the following: 
+
+- Genome
+  - Think of this as an entire library of all the pieces and instructions for a human
+  - The collection of all chromosomes
+- Chromosome
+  - Think of this as the organization method of the library
+  - One single DNA molecule, packaged tightly
+- Gene
+  - Think of this as individual recipes that make something, but just the ingredients list
+  - A section of DNA (or a section of RNA) that does something
+- DNA
+  - Think of this as the letters that are used for writing everything
+  - Made up of four chemicals
+  - Is a double-helix (i.e., two-strands)
+  - DNA is "the original" plans, so to keep them safe, copies are made; Transcription
+  - Copies are then used to do what the plans say
+- RNA
+  - Think of this as the copy ??? Not sure what to put here
+  - RNA is one-side of the DNA strand
+  - It is how instructions can be carried out; Instructions include "make a protein"; Translation 
+- mRNA
+- Protein
+  - Proteins are 
+
+
+- Humans are essentially meat-bags
+- We have different kinds of "meat" but they're all made up of cells
+- The types of cells and types of meats are "Cellular Biology" - we're not going to focus on this, at all
+- We are going to be looking at things that are smaller than cells, and basically how they impact cells (which then impact other things)
+- 
 
 
 
@@ -30,7 +71,7 @@ Establishing a reproducible analysis environment.
 ```{python}
 #| label: analyze-setup-debugger
 #| eval: false
-#| output: false
+#| output: true
 
 # Used if needed to debut environment issues
 
@@ -45,6 +86,43 @@ print("usersite:", site.getusersitepackages())
 
 for k in ["PYTHONHOME", "PYTHONPATH", "CONDA_PREFIX", "VIRTUAL_ENV"]:
     print(k, "=", os.environ.get(k))
+
+
+import os, shutil, subprocess
+from pathlib import Path
+
+print("sys.executable:", sys.executable)
+print("CONDA_PREFIX:", os.getenv("CONDA_PREFIX"))
+print("CONDA_PREFIX_1:", os.getenv("CONDA_PREFIX_1"))
+print("CONDA_EXE:", os.getenv("CONDA_EXE"))
+print("which conda:", shutil.which("conda"))
+
+# Try common locations
+candidates = []
+if os.getenv("CONDA_EXE"):
+    candidates.append(os.getenv("CONDA_EXE"))
+if os.getenv("CONDA_PREFIX_1"):
+    candidates.append(str(Path(os.getenv("CONDA_PREFIX_1")) / "Scripts" / "conda.exe"))
+if os.getenv("CONDA_ROOT"):
+    candidates.append(str(Path(os.getenv("CONDA_ROOT")) / "Scripts" / "conda.exe"))
+
+print("\nCandidates:")
+for c in candidates:
+    print(" ", c, "exists=", Path(c).exists())
+
+# Try running conda directly if we found one
+conda = next((c for c in candidates if Path(c).exists()), None) or shutil.which("conda")
+print("\nResolved conda:", conda)
+
+if conda:
+    p = subprocess.run([conda, "--version"], capture_output=True, text=True)
+    print("conda --version rc:", p.returncode)
+    print("stdout:", p.stdout.strip())
+    print("stderr:", p.stderr.strip())
+else:
+    print("No conda found in this process.")
+
+
 
 ```
 
@@ -346,59 +424,84 @@ def conda_available() -> bool:
 
 
 def get_conda_installed_versions_strict() -> dict[str, str]:
-    """
-    Returns name->version from `conda list --json`.
-
-    Raises a helpful error if conda cannot be found or if the command fails.
-    """
     cmd = _conda_cmd()
     if not cmd:
-        raise FileNotFoundError(
-            "Could not find conda executable (CONDA_EXE not set, conda not on PATH, "
-            "and could not derive conda.exe from CONDA_PREFIX)."
-        )
+        raise FileNotFoundError("Could not find conda executable...")
 
-    proc = subprocess.run(cmd + ["list", "--json"], capture_output=True, text=True)
+    prefix = os.getenv("CONDA_PREFIX")
+    if not prefix:
+        raise RuntimeError("CONDA_PREFIX is not set; cannot target env.")
+
+    proc = subprocess.run(
+        cmd + ["list", "--json", "--prefix", prefix],
+        capture_output=True,
+        text=True,
+    )
     if proc.returncode != 0:
         raise RuntimeError(f"conda list failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
 
     items = json.loads(proc.stdout)
-    out: dict[str, str] = {}
+    out = {}
     for it in items:
         name = (it.get("name") or "").strip().lower()
         ver = (it.get("version") or "").strip()
         if name and ver:
             out[name] = ver
 
-    # reflect the running interpreter's python version (helps with "custom interpreter" reality)
     out["python"] = sys.version.split()[0]
     return out
 
-
 def get_conda_chosen_from_history() -> dict[str, str | None]:
     """
-    What YOU asked conda for (closest proxy for 'every install command I sent'):
-    `conda env export --from-history`
+    Packages explicitly requested in this env (best proxy):
+    `conda env export --from-history [--prefix ...]`
+
+    Returns: canonical_name -> constraint/pin/None
+      - Handles pins:   name, name=1.2.3, name=1.2.3=build
+      - Handles constraints: name<2, name>=3.11, name ~=1.4, etc.
     """
     cmd = _conda_cmd()
     if not cmd:
         return {}
 
-    proc = subprocess.run(cmd + ["env", "export", "--from-history"], capture_output=True, text=True, check=True)
+    # Prefer CONDA_PREFIX if available; otherwise fall back to interpreter prefix
+    prefix = os.getenv("CONDA_PREFIX") or str(Path(sys.executable).resolve().parent.parent)
+
+    proc = subprocess.run(
+        cmd + ["env", "export", "--from-history", "--prefix", prefix],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        # If conda isn't available in this context, just return empty (don't blow up rendering)
+        return {}
+
     data = yaml.safe_load(proc.stdout) or {}
     deps = data.get("dependencies", []) or []
 
     chosen: dict[str, str | None] = {}
+
     for dep in deps:
-        if isinstance(dep, str):
-            s = dep.strip()
-            if not s:
-                continue
-            parts = s.split("=")
-            name = parts[0].strip().lower()
-            ver = parts[1].strip().lstrip("=") if len(parts) >= 2 else None
-            chosen[name] = ver
+        if not isinstance(dep, str):
+            continue
+        s = dep.strip()
+        if not s:
+            continue
+
+        # constraint case: python>=3.11, setuptools<80, numpy!=2.0, etc.
+        m = re.match(r"^([A-Za-z0-9_.-]+)\s*([<>=!~].+)$", s)
+        if m:
+            chosen[_canonical(m.group(1))] = m.group(2).strip()
+            continue
+
+        # pin case: name, name=ver, name=ver=build
+        parts = s.split("=")
+        name = _canonical(parts[0])
+        ver = parts[1].strip().lstrip("=") if len(parts) >= 2 else None
+        chosen[name] = ver
+
     return chosen
+
 
 
 def get_pip_installed_all() -> dict[str, str]:
@@ -527,10 +630,6 @@ else:
 
 
 ```
-
-
-
-
 
 ## Data Acquisition
 
@@ -726,6 +825,9 @@ df_clinical_sample = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
 
 ## MRNA Seq
 
+
+
+
 ```{python}
 #| label: analyze-data-acquisition-loading-mrna
 #| eval: true
@@ -793,6 +895,197 @@ html`
 `
  
 ```
+
+### Review
+DNA has many Genes (i.e., regions)
+A gene is a part of the DNA that does something, and is defined by specific coordinates (one start, and one end)
+In order for those recipes to do anything, the DNA is copied to RNA, in a process called transcription.
+This RNA is called "Pre-mRNA (Precursor mRNA or heterogenous nuclear RNA: hnRNA)"
+The Pre-mRNA is processed by removing certain parts (slicing), adding stuff to one end (capping), and adding other stuff to the other end (polyadenylation), which then makes it "Mature mRNA" (we'll just call this mRNA from now). 
+... in cellular biology, this would then go and do things, perhaps make proteins ... 
+
+### RNA Sequencing
+We take our sample and turn Mature mRNA into RNA fragments, in a process called fragmentation.
+Then, with turn those RNA fragments into cDNA fragments, in a process called reverse transcription.
+This all goes into a High-throughput sequencing machine to give us sequences/reads of every fragment. This will be an ordered list of the chemicals (A C G T) ?? Do we read the RNA or the c-DNA strand
+
+Major Data Point 1: We now have a count of all the fragments (and what they are)
+
+All of these reads need to get aligned back to the original gene.
+
+### Problems
+- Different versions of Mature mRNA (which are referred to as an "isoform") can happen because of an issue during the processing from Pre-mRNA to Mature mRNA including:
+  - Alternative transcript initiation
+  - Alternative 5' splice site
+  - Altertiave 3' splice site
+  - Skipped exon
+  - Alternative polyadenylation
+  - ... others
+- It is expensive and takes a long time to do really long reads (e.g., the whole gene), which is why we need to fragment the mRNA into smaller pieces.
+  - This means that we might not always capture all the different isoforms.
+- Fragments might align to more than one isoform, or to a different gene.
+
+### Goal
+**Expression Analysis**, estimate a transcriptome, the set of all expressed transcripts and their frequencies in a cell at a given time. 
+
+- We can measure/calculate the relative expression (i.e., frequency) of two things in our sample:
+  - Transcripts (i.e., What proportion of the sample was expressed by a specific isoform, by transcripts?)
+    - e.g., There are a total of 100 transcripts in the whole sample. Isoform AAA1 was expressed by 88 of them.
+  - Nucleotides (i.e., What proportion of the sample was expressed by a specific isoform, by nucleotides?)
+    - e.g., There are a total of 1,000,000 nucleotides in the whole sample. Isoform BBB2 was expressed by 500,000 of them.
+
+### Somethingsomething
+
+Definitions
+All definitions are framed for cBioPortal, the software system (which includes a website, and database) for interactive exploration of multidimensional cancer genomics data sets.
+
+TCGA
+: The Cancer Genome Atlas, a project that profiles specific cancer types to understand their individual molecular landscape.
+
+PanCanAtlas
+: a Pan-Cancer Initiative that took all 33 TCGA cancer types and analyzed them together to compare molecular similarities and differences.
+
+Study
+: Often identified by its acronym (e.g., TCGA-LGG) represents the specific tumour cohort that was analyzed.
+
+Ontology
+: a set of concepts and categories in a subject area or domain that shows their properties and the relations between them
+
+OncoTree
+: the cancer type ontology used by cBioPortal, which has has a root node of Tissue, so Level 1 would be all the Tissue Sites, then they are categorized by cancer types.
+
+cBioPortal Data Model
+
+Database
+Studies
+Clinical Data
+Samples
+Sample Lists
+Patients
+Namespace Attributes
+Mutations
+Molecular Data
+Gene Panel Data
+Discrete Copy Number Alterations
+Molecular Profiles
+Genes
+Generic Assays
+Generic Assay Data
+Gene Panels
+Copy Number Segments
+Clinical Attributes
+Cancer Types
+
+
+
+
+Database, the 
+Dataset, the set of files for a particular study
+Data Type: Clinical
+Data Type: Molecular
+Sequencing
+RNA Sequencing
+RSEM
+
+
+RSEM defines the following; 
+
+For isoform $i$, 
+$\nu_i$, the fraction of nucleotides made up by a given gene or isoform
+$$
+\nu_i = \frac{\tau_i\ell_i}{\sum_j\tau_j\ell_j}
+$$
+
+$\tau_i$, the fraction of transcripts made up by a given gene or isoform
+$$
+\tau_i = \frac{\nu_i}{\ell_i}\left(\sum_j\frac{\nu_j}{\ell_j}\right)^{-1}
+$$
+
+where $\ell_i$ is the length, in nucleotides, of isoform $i$. 
+
+ 
+The probability that the read sequence
+$$
+P(r|\theta) = \prod_{n=1}^N\sum_{i=0}^M\theta_i P(r_n|G_n=i)
+$$
+
+
+
+
+
+EM Algorithm
+- An iterative method to find (local) maximum likelihood estimates of parameters in statistical models, where the model depends on unobserved latent variables. 
+
+RSEM Model
+- Generates reads from a combination of isoform, start position, and orientation
+- $N$ the number of reads generated (independent and identically distributed)
+  - i.i.d is an assumption that is supported by uniform sampling, massive parallelization and high depth, random fragmentation, poisson/negative binomial approximation accounting for dispersion
+  - i.i.d. for rna-seq is rarely perfect, but is helpful for when we do differential expression analysis
+- $L$ the length of reads
+- Random Variables
+  - $R_n$, read sequences (i.e., observed data)
+- Latent Random Variables
+  - $G_n$, isoform (from which the read came from)
+  - $S_n$, start position (from which the read came from)
+  - $O_n$, orientation (from which the read came from)
+- Parameters
+  - $\theta = [\theta_0, ... , \theta_M]$, the expression levels
+    - We assume $M$, all possible isoforms in a transcriptome, is given
+
+
+More Details
+- $G_n \in \{0, ..., M\}$, where $0$ represents a 'noise' isoform, which generates reads that do not map to known isoforms.
+  - The probability of any given isoform is determined when the expression levels for that isoform equals 1. 
+  - $P(G_n=i | \theta) = \theta_i \text{  where  } \sum_i\theta_i = 1$
+- $S_n \in \{1, ..., \text{max}_i\ell_i}$, where $\ell_i$ is the length of isoform $i$
+  - $P(S_{n=j} | G_{n=i})$ is called the *read start position distribution* (RPSD)
+  - $P(S_{n=j} | G_{n=i}) = \ell^{-1}_i$, for reads generated uniformly across transcripts and mRNA with poly(A) tails
+    - The other models are not shown, because the important part is the relationship with length
+- $O_n \in \{0, 1\}$
+  - 0 indicating that the sequence of read n is in the same orientation as that of its parent isoform
+  - 1 indicating thet the sequence of read n is the reverse complement of its parent isoform
+- $R_n$ summarizes the hidden random variables for the $n$-th read with a set of indicator random variables
+  - $Z_{nijk} \text{  where  } Z_{njk} = 1 \text{ if } (G_n, S_n, O_n) = (i, j, k)$
+  - Therefore, the conditional probability of a read sequence derived from an isoform (other than the noise isoform) is given by
+
+$$
+P(R_n = \rho | Z_{njk} = 1) = \begin{cases}
+    \prod_{t=1}^L w_t(\rho_t , \gamma_{j+t-1}^i) \qquad k=0 \\
+    \prod_{t=1}^L w_t(\rho_t , \bar{\gamma}_{j+t-1}^i) \qquad k=1
+\end{cases}
+$$
+
+  - $\gamma^i$ is the sequence of the isoform $i$ and $\bar{\gamma}^i$ is its reverse complement
+  - $w_t(a,b)$ is a position-specific substitution matrix, where the value is the probability that we observe character $a$ as position $t$ of the read given that the corresponding character in the reference isoform sequence is $b$
+
+
+
+
+
+
+
+
+
+Expresseions at the gene level is simply the sum of the expression of possible isoforms. 
+
+NOTE: There is some really interesting Maths regarding the RSEM algorithm alternating between the E-step and the M-step that results in the concavity of the log likelihood function (i.e., guaranteed to reach a global maximum). 
+
+
+What the bloody hell does this even mean?
+
+We're looking at "genes.normalized_results" so it's going to be the sum of isoforms
+
+- RNASeqV2 = Processed using RSEM (RNA-Seq by Expectation-Maximization)
+  - Specifically data_mrna_seq_v2_rsem.txt = to the rsem.genes.normalized_results file from TCGA
+- RSEM calculates the estimated number of reads that aligned to a transcript (i.e., relative expression)
+  - **fraction of transcripts**
+  - **fraction of nucleotides**
+
+What do the numbers in data_mrna_seq_v2_rsem.txt mean? 
+```{python}
+1
+```
+
 
 ## Data Cleaning
 

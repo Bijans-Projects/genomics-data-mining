@@ -1,0 +1,141 @@
+digraph cbioportal_dependency {
+    newrank=true;
+    
+    graph [
+        rankdir=TB,
+        compound=true,
+        //splines=true,
+        nodesep=0.35,
+        concentrate=true,
+        ranksep=1.1,
+        fontname="Helvetica",
+        fontsize=12,
+        labelloc="t"
+      ];
+      node  [shape=box, style="rounded", fontname="Helvetica", fontsize=11];
+      edge  [fontname="Helvetica", fontsize=10];
+  
+    subgraph cluster_L0 {
+        label="Level 0 - Root"
+        style="rounded";
+        color="#999999";
+        fontcolor="#333333";
+        
+        database    
+    }
+    database -> cancer_types [lhead=cluster_L1]
+    //database -> genes
+    
+    
+    
+    
+    subgraph cluster_L1 {
+        label="Level 1 - Global"
+        style="rounded";
+        color="#999999";
+        fontcolor="#333333";
+        
+        { rank = same; cancer_types; genes; }
+        { rank = same; studies; gene_panels; }
+        
+        cancer_types
+        genes
+        studies
+        gene_panels
+        
+        cancer_types -> studies
+        genes -> gene_panels
+    }
+    studies -> patients [lhead=cluster_L2];
+    //studies -> molecular_profiles
+    gene_panels -> gene_panel_data
+    
+    
+    
+    
+    
+    subgraph cluster_L2 {
+        label="Level 2 - Studies"
+        style="rounded";
+        color="#999999";
+        fontcolor="#333333";
+        
+        { rank=same; patients; molecular_profiles; }
+        { rank=same; clinical_attributes; generic_assays; molecular_data; copy_number_segments; discrete_cna; mutations; gene_panel_data; }
+        { copy_number_segments -> molecular_data -> generic_assays -> mutations -> discrete_cna -> gene_panel_data [ style=invis ]; }
+        
+        patients
+        molecular_profiles
+        samples
+        sample_lists
+        
+        
+        subgraph cluster_L2_clinical {
+            label="Clinical Layer"
+            style="rounded";
+            color="#999999";
+            fontcolor="#333333";
+            
+            clinical_attributes
+            clinical_data
+            
+            clinical_attributes -> clinical_data
+        }
+    
+    
+        patients -> clinical_attributes [lhead=cluster_L2_clinical]
+        patients -> samples
+    
+        samples -> sample_lists 
+        samples -> molecular_data [lhead=cluster_L2_molecular_layer]
+        //samples -> discrete_cna
+        //samples -> mutations
+        //samples -> gene_panel_data
+        //samples -> generic_assays
+        //samples -> copy_number_segments
+    
+        molecular_profiles -> d1 [dir=none]
+        
+        d1 -> molecular_data
+        d1 -> discrete_cna
+        d1 -> mutations
+        d1 -> gene_panel_data
+        d1 -> generic_assays
+        
+        //molecular_profiles -> molecular_data
+        //molecular_profiles -> discrete_cna
+        //molecular_profiles -> mutations
+        //molecular_profiles -> gene_panel_data
+        //molecular_profiles -> generic_assays
+    
+        subgraph cluster_L2_molecular_layer {
+            label="Molecular Layer"
+            style="rounded";
+            color="#999999";
+            fontcolor="#333333";
+            
+            d1 [shape=point, width=0.01, height=0.01, label="", style=invis];
+        
+            copy_number_segments
+            generic_assays
+            generic_assay_data
+            molecular_data
+            discrete_cna
+            mutations
+            gene_panel_data
+            namespace_attributes
+            
+            generic_assays -> generic_assay_data
+            discrete_cna -> namespace_attributes
+            mutations -> namespace_attributes
+        }
+    }
+    
+
+
+    
+
+    
+
+}
+

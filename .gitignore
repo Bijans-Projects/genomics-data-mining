@@ -8,6 +8,13 @@ data/raw/*
 !data/interim/README.md
 !data/raw/README.md
 
+# Keep folder structure in git
+/env/
+/.quarto/
+**/*.quarto_ipynb
+.vdoc.*
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -217,8 +224,3 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Keep folder structure in git
-!.gitkeep
-/env/
-/.quarto/
-**/*.quarto_ipynb
