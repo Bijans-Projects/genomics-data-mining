@@ -1,0 +1,80 @@
+digraph {
+    rankdir=TD;
+    graph [concentrate=true];
+    
+    # Nodes
+
+        
+    
+    ## Start / End
+    node [ shape = circle];
+        start [label=""];
+        end [ label="" ];
+        
+        
+    ## Processes: REctangles with rounded corners
+    node [ shape = box, style = none, fontsize="11", fontcolor="grey", color="grey"];
+        lyse [ label="Lyse"];
+        extract [ label="Extract"];
+        enrich [ label="Enrich", comment="only affects mRNA"];
+        #isolate [label="Isolate"];
+        fragment [label="Fragment"];
+        convert [label="Convert", comment="Reverse Transcription"];
+        adapt [label="Adapt", comment="Adapter ligation (i.e., add adapters to both ends"];
+        amplify [label="Multiply", comment="PCR Amplification"];
+        qc [label="Quality Control"];
+    ## Physical Material: Parallelogram
+    node [ shape = box, style = rounded, fontsize="14", fontcolor="black", color="black"];
+        tumour [label="Tumor Sample"]; # Let's assume a sample of 500 mg; On average there's a billion cells per gram of tissue. So, we have about 0.5 billion cells; We use only 50 mg, which is 50 million cells.
+        lysate [label="Cell Lysate"]; # We're adding a chemical here to do the lysing right? Which will effect the TOTAL RNA concentration. 
+        rna [label="Total RNA"]; # NOTE: High concentrations are diluted; Total RNA concentration = ____; and has the following composition: 
+        rrna [label="rRNA"]; # ___% of Total RNA
+        trna [label="tRNA"]; # ___% of Total RNA
+        rna_other [label="other RNAs"]; # ___% of Total RNA
+        mrna_1 [label="mRNA"]; # 2.5% of Total RNA
+        mrna_2 [label="mRNA"]; # --- ? is there where we use the concentration that was calculated previously to determine the number of mRNA molecules? 
+        mrna_3 [label="mRNA Fragments"]; # Now we fragment to a specific length ... we'll say an average ... it's a distribution though, right? similar to the length of mRNA. right?
+        cdna_1 [label="cDNA"]; # now we have the same number of molecules, except now they're cDNA
+        cdna_2 [label="cDNA"]; # now we have the same number of cDNA molecules, but we also have some other garbage stuff. 
+        cdna_3 [label="cDNA"]; # now we have amplification so we have some factor more cDNA
+        cdna_4 [label="cDNA"]; # now we do some cleaning and lose some .... what we're left with is a number - the number of total fragments. We also know their length, so we know how many nucleotides there are. 
+    ## Data object: Paper document icon
+    node [ shape = note, style = none];
+    
+
+    # Edges
+    ## Process: Solid linewith arrowhead
+    ## Annotations: Dotted line with arrowhead
+    edge [ color="grey"];
+    
+    
+    
+    start -> tumour;
+    
+    tumour -> lyse -> lysate;
+    lysate -> extract -> rna;
+    subgraph cluster_totalRNA {
+        label = "Total RNA"
+        rrna
+        trna
+        mrna_1
+        rna_other
+    }
+    rna -> {rrna, mrna_1, rna_other, trna} [arrowhead=none];
+        {rrna, mrna_1, rna_other, trna} -> enrich -> mrna_2;
+    mrna_2 -> fragment -> mrna_3;
+    mrna_3 -> convert -> cdna_1;
+    cdna_1 -> adapt -> cdna_2;
+    cdna_2 -> amplify -> cdna_3;
+    cdna_3 -> qc -> cdna_4;
+    
+    cdna_4 -> end;
+    
+    
+    
+    
+    
+    ## Invisible
+    node [ label="", shape=point, height=.0, width=.0];
+        ## just in case we need arrows to nowhere to show loss of something, like losing cDNA, or mRNA, etc. 
+}

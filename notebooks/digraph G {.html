@@ -1,0 +1,202 @@
+digraph G {
+    rankdir=TD;
+    graph [concentrate=true];
+    
+    node [shape=record];
+        a [label="<id> id|<id2>2|<id3>3"]
+    
+    # Nodes
+    ## Start / End
+    node [ shape = box, style = rounded];
+        tumour [label="Tumor Sample \n 250 mg"]; # 250 mg - not from real data
+    ## Processes: REctangles with rounded corners
+    node [ shape = box, style = none];
+        isolate [label="RNA Isolation"];
+        fragment [label="Fragmentation"];
+        convert [label="Convert"];
+        adapt [label="Add Adapters"];
+        amplify [label="PCR Amplification"];
+        qc [label="Quality Control"];
+    ## Physical Material: Parallelogram
+    node [ shape = parallelogram ];
+        rna [label="RNA\n1-5 µg\n10⁹–10¹⁰ RNA molecules"]
+        rrna [label="rRNA \n 80-90%"];
+        mrna_1 [label="mRNA \n 1-5%"];
+        mrna_2 [label="mRNA"];
+        cdna_1 [label="cDNA"];
+        cdna_2 [label="cDNA"];
+        cdna_3 [label="cDNA"];
+    ## Data object: Paper document icon
+    node [ shape = note, style = none];
+    
+    # Edges
+    ## Process: Solid linewith arrowhead
+    ## Annotations: Dotted line with arrowhead
+
+    
+    
+    tumour -> isolate -> rna -> {rrna, mrna_1}
+    mrna_1 -> fragment -> mrna_2
+    mrna_2 -> convert -> cdna_1
+    cdna_1 -> adapt -> cdna_2
+    cdna_2 -> amplify -> cdna_3
+    cdna_3 -> qc
+    
+    // General styles
+    node [shape=none, fontname="Helvetica"];
+    edge [fontname="Helvetica", fontsize=10];
+    rankdir=LR; // Left to Right flow
+
+    // 1. Tumor Sample
+    Tumor [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR><TD BGCOLOR="#D3D3D3"><B>Tumor Sample</B></TD></TR>
+            <TR><TD>Quantity: <FONT COLOR="blue">250 mg</FONT></TD></TR>
+        </TABLE>
+    >];
+
+    // 2. RNA (The intermediate)
+    RNA [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR><TD BGCOLOR="#D3D3D3"><B>Total RNA</B></TD></TR>
+            <TR><TD>Yield: <FONT COLOR="blue">1-5 µg</FONT></TD></TR>
+            <TR><TD>Count: <FONT COLOR="blue">10^9 molecules</FONT></TD></TR>
+        </TABLE>
+    >];
+
+    // 3. rRNA
+    rRNA [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR><TD BGCOLOR="#FFE4E1"><B>rRNA</B></TD></TR>
+            <TR><TD>Fraction: <B>80-90%</B></TD></TR>
+        </TABLE>
+    >];
+
+    // 4. mRNA
+    mRNA [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR><TD BGCOLOR="#E0FFFF"><B>mRNA</B></TD></TR>
+            <TR><TD>Fraction: <B>1-5%</B></TD></TR>
+        </TABLE>
+    >];
+
+    // Connections
+    Tumor -> RNA [label="RNA Isolation"];
+    RNA -> rRNA;
+    RNA -> mRNA;
+
+
+
+    rankdir=LR;
+    node [fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=10, color="#555555"];
+
+    // --- Node Styles ---
+    
+    // Processes: Simple, clean rounded boxes
+    node [shape=box, style="rounded,filled", fillcolor="#f9f9f9", color="#333333"];
+    isolate [label="RNA Isolation"];
+    fragment [label="Fragmentation"];
+    convert [label="Convert"];
+    adapt [label="Add Adapters"];
+    amplify [label="PCR Amplification"];
+    qc [label="Quality Control"];
+
+    // Physical Material: Parallelograms with internal formatting
+    // We use shape=parallelogram but fill the label with an HTML table
+    node [shape=parallelogram, style=filled, fillcolor="#e1f5fe", color="#01579b"];
+    
+    tumour [label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>Tumor Sample</B></TD></TR>
+            <HR/>
+            <TR><TD><FONT POINT-SIZE="9">250 mg</FONT></TD></TR>
+        </TABLE>
+    >];
+
+    rna [label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>Total RNA</B></TD></TR>
+            <HR/>
+            <TR><TD><FONT POINT-SIZE="9">1-5 µg</FONT></TD></TR>
+            <TR><TD><FONT POINT-SIZE="9">10⁹–10¹⁰ molecules</FONT></TD></TR>
+        </TABLE>
+    >];
+
+    rrna [label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>rRNA</B></TD></TR>
+            <HR/>
+            <TR><TD><FONT COLOR="#cc0000" POINT-SIZE="9">80-90%</FONT></TD></TR>
+        </TABLE>
+    >];
+
+    mrna_1 [label=<
+        <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            <TR><TD><B>mRNA</B></TD></TR>
+            <HR/>
+            <TR><TD><FONT COLOR="#007f00" POINT-SIZE="9">1-5%</FONT></TD></TR>
+        </TABLE>
+    >];
+
+    // Simpler materials (no metadata yet)
+    node [fillcolor="#fff3e0", color="#e65100"];
+    mrna_2 [label="mRNA"];
+    cdna_1 [label="cDNA"];
+    cdna_2 [label="cDNA"];
+    cdna_3 [label="cDNA"];
+
+    // --- Edges ---
+    tumour -> isolate;
+    isolate -> rna;
+    rna -> rrna;
+    rna -> mrna_1;
+    mrna_1 -> fragment;
+    fragment -> mrna_2;
+    mrna_2 -> convert;
+    convert -> cdna_1;
+    cdna_1 -> adapt;
+    adapt -> cdna_2;
+    cdna_2 -> amplify;
+    amplify -> cdna_3;
+    cdna_3 -> qc;
+}
+
+
+
+    rankdir=LR;
+    node [fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9, color="#2c3e50", fontcolor="#2c3e50"];
+
+    // Material Style: A clean "Badge" look
+    node [shape=plaintext];
+
+    tumour [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2c3e50">
+            <TR><TD BGCOLOR="#34495e"><FONT COLOR="white"><B>Tumor Sample</B></FONT></TD></TR>
+            <TR><TD>250 mg</TD></TR>
+        </TABLE>>];
+
+    rna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#27ae60">
+            <TR><TD BGCOLOR="#2ecc71"><FONT COLOR="white"><B>Total RNA</B></FONT></TD></TR>
+            <TR><TD>1-5 µg</TD></TR>
+        </TABLE>>];
+
+    mrna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2980b9">
+            <TR><TD BGCOLOR="#3498db"><FONT COLOR="white"><B>mRNA</B></FONT></TD></TR>
+            <TR><TD>1-5% of Total</TD></TR>
+        </TABLE>>];
+
+    cdna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#8e44ad">
+            <TR><TD BGCOLOR="#9b59b6"><FONT COLOR="white"><B>cDNA Library</B></FONT></TD></TR>
+            <TR><TD>Ready for Seq</TD></TR>
+        </TABLE>>];
+
+    // Edges with Process Labels
+    // Using 'labeldistance' or just simple labels
+    tumour -> rna [label="  Isolation  ", penwidth=2];
+    rna -> mrna [label="  Enrichment  ", penwidth=2];
+    mrna -> cdna [label="  Reverse Transcription\n+ Library Prep  ", penwidth=2];

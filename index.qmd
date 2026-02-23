@@ -77,6 +77,7 @@ Establishing a reproducible analysis environment.
 
 import sys, os, site
 print("exe:", sys.executable)
+from itables.options import maxBytes
 print("ver:", sys.version)
 print("prefix:", sys.prefix)
 print("base_prefix:", sys.base_prefix)
@@ -234,6 +235,8 @@ RANDOM_SEED = 3660
 
 # ITables
 # itables.init_notebook_mode()
+itables.options.autoWidth = False
+itables.options.style = "table-layout:auto;width:100%;margin:auto"
 
 # Pandas
 pd.set_option("display.max_rows", 30)
@@ -661,6 +664,7 @@ We use the cBioPortal to gather data about what is available.
 #| label: analyze-data-acquisition-cancer-types-api
 #| eval: true
 #| display: true
+#| column: screen-inset
 
 # Cancer Types API
 cancer_types_api_config = cbioportal.Configuration()
@@ -680,6 +684,8 @@ itables.show(
 #| label: analyze-data-acquisition-studies-api
 #| eval: true
 #| display: true
+#| column: screen-inset
+
 # Studies API
 studies_api_instance = cbioportal.StudiesApi()
 
@@ -687,7 +693,8 @@ cbioportal_studies = studies_api_instance.get_all_studies_using_get()
 cbioportal_studies = pd.DataFrame([item.to_dict() for item in cbioportal_studies])
 
 itables.show(
-    cbioportal_studies
+    cbioportal_studies,
+    maxBytes=0
 )
 ```
 
@@ -696,6 +703,7 @@ itables.show(
 #| label: analyze-data-acquisition-clinical-attributes-api
 #| eval: true
 #| display: true
+#| column: screen-inset
 
 # Clinical Attributes API
 
@@ -791,12 +799,10 @@ def describe_dataframe_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 clinical_patient_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
-
 df_clinical_patients = pd.read_csv(clinical_patient_file, sep="\t", comment="#")
+itables.show(df_clinical_patients)
 
 described_df_clinical_patients = describe_dataframe_table(df_clinical_patients)
-
-
 itables.show(
     described_df_clinical_patients,
     paging=False,
@@ -816,10 +822,11 @@ itables.show(
 
 
 clinical_sample_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
+df_clinical_samples = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
+itables.show(df_clinical_samples)
 
-
-
-df_clinical_sample = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
+described_df_clinical_samples = describe_dataframe_table(df_clinical_samples)
+itables.show(described_df_clinical_samples)
 
 ```
 
@@ -834,13 +841,13 @@ df_clinical_sample = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
 #| display: true
 
 mrna_seq_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_mrna_seq_v2_rsem.txt")
-
-
 df_mrna_seq = pd.read_csv(mrna_seq_file, sep="\t", comment="#")
-
 itables.show(
     df_mrna_seq
 )
+
+described_df_mrna_seq = describe_dataframe_table(df_mrna_seq)
+itables.show(described_df_mrna_seq)
 
 # expr = df.iloc[:, 2:]
 
@@ -873,6 +880,17 @@ itables.show(
 
 Thesse are some words in this section
 
+### TODO: DELETE ME
+
+```{python}
+
+timeline_sample_acquisition_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_timeline_sample_acquisition.txt")
+df_timeline_sample_acquisition = pd.read_csv(timeline_sample_acquisition_file, sep="\t", comment="#")
+
+
+df_timeline_sample_acquisition.groupby("METHOD_OF_SAMPLE_PROCUREMENT")["TUMOR_WEIGHT"].mean()
+
+```
 
 
 ## Data Understanding
@@ -905,7 +923,16 @@ The Pre-mRNA is processed by removing certain parts (slicing), adding stuff to o
 ... in cellular biology, this would then go and do things, perhaps make proteins ... 
 
 ### RNA Sequencing
-We take our sample and turn Mature mRNA into RNA fragments, in a process called fragmentation.
+Goal: From a tissue sample of a tumor, find out how many genes are being expressed
+
+1. Isolate
+   1. Tumor Sample --> RNA
+   2. We isolate all the RNA
+2. Fragment
+   1. Isolated RNA --> 
+
+We take our tumor sample and isolate all of the RNA (or poly-A selected mRNA)
+turn Mature mRNA into RNA fragments, in a process called fragmentation.
 Then, with turn those RNA fragments into cDNA fragments, in a process called reverse transcription.
 This all goes into a High-throughput sequencing machine to give us sequences/reads of every fragment. This will be an ordered list of the chemicals (A C G T) ?? Do we read the RNA or the c-DNA strand
 
@@ -1351,3 +1378,123 @@ This is one layer of biology.
 > "We didn't count genes.\
 > We counted how loudly each gene was being read.\
 > And in that noise... the pattern begins to whisper."
+
+
+
+
+I'm trying to focus on simplifying and understanding sequencing for the cancer data project. 
+
+In the readme for one of the TCGA Pancan datasets, is something saying Tumor Break Load: 
+ - TBL scores based on Lakbir et al., 2024 (Manuscript in progress)
+ - Overview of TBL calculation for TCGA, from [Lakbir et al., Eur J Cancer 2024](https://pubmed.ncbi.nlm.nih.gov/36334560/)
+ - Data is provided as a sample-level clinical attribute labeled `Tumor Break Load`
+
+... Is this relevant to what I want to know ... which is .... 
+First, what I think I understand: 
+
+We have a study (e.g. TCGA-LGG) that focuses on the particular cancer (CNV/Brain: LGG), which has some patients, who had a sample of the cancer taken. 
+That sample then went through a process which ended up in some data. 
+
+The lab stuff, I don't need to know (at least not details). In the end ... basically we have something that goes into a "Illumina HiSeq 2000 RNA Sequencing Version 2 analysis" - which is the name of a machine, and a particular set of settings/process used on that machine. 
+
+
+Part 1: Prepare a sequence library
+Steps: 
+1. Isolate the RNA
+2. Break the RNA into small fragments (because RNA transcripts can be very long and the machine can only sequence something short -- not sure how short)
+3. Convert the RNA fragments into double stranded DNA (cDNA?) - because double stranded DNA is more stable than RNA, and it can be easily amplified and modified
+4. Add sequencing adaptors (because two things: 1. Allows the sequencing machine to recognize the fragments, 2. could do many samples at once, with different adaptors)
+   1. Doesn't work 100% of the time
+5. PCR Amplify (not sure what this means or why it's important)
+6. Quality control
+   1. Verify Library concentration
+   2. Verify library fragment lengths
+
+Part 2: Sequence
+1. DNA is vertical, on a grid called a Flow Cell (maybe 400 million fragments are laid out ... is it all of them at once?)
+2. Colour coded (based on nucleotide) Fluorescent probes attach to the first base
+3. Machine takes picture - shows colours
+4. Washes the colours off the probes
+5. Repeats step 2-4 until done
+- Quality scores quantify how confident the machine is that it got the correct base, and some problems that affect this could be:
+  - a probe isn't bright enough, so machine isn't sure of the colour for a specific probe
+  - lots of probes of the same colour in the same region (bigger problem is it happens early in the sequencing) -- called low diversity
+
+THIS IS WHERE THE REAL "RAW" DATA IS
+
+So, a "read" is 4 lines of data: 
+@ Unique ID for the sequence
+Sequences that the machine got
++
+Quality score for each base 
+
+?? Maybe a typical sequence run with 400 million reads, will generate a file with 1.6 billion lines of data 
+
+Part 3: Data Stuff?? (Not data analysis, per se ... more like preparing to give stuff for data analysis??) -- I'm pretty sure this is NOT part of the actual machine ... what we get from the machine is the raw data. Then we get into some basic data prep/cleansing  ... alignment to a genome ... counting the number of reads per gene (which includes or also has standardization/normalization).... 
+
+1. Filter out garbage reads
+   1. garbage reads are those with low quality base calls, reads that are clearly artifacts of the chemistry (e.g., adapters binded to each other, so the read is just adapter sequence)
+2. Align the high quality reads to a genome
+   1. We start with a genome (for us it's the human genome)
+   2. It gets split into small fragments 
+      1. This is because it allows us to align reads even if they are not exact matches to the reference genome; because genomes are not identical across the population
+   3. Fragments / Locations are indexed
+   4. Match read fragments to the genome fragments / locations
+      1. Genome fragments that match read fragments determine the location of the genome (chromosome/position)
+3. Count the number of reads per gene
+   1. Now we have chromosome/position for a read - we check if it falls within the coordinate of a gene (or another interesting feature)
+
+BAM - now we have a matrix of numbers: Rows are 1 per Gene, columns are samples, and values are the raw counts. 
+
+
+Not sure if we're doing "bulk" RNA-seq or "single-cell" RNA sequencing. 
+
+NOW ... data normalization ... Because samples might have a different number of reads (could be because of quality or concentration of flow cell)
+
+And ... this is when we get into RSEM... 
+
+
+
+
+So ... Am I correct or wrong? 
+
+
+
+digraph BioHybrid {
+    rankdir=LR;
+    node [fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9, color="#2c3e50", fontcolor="#2c3e50"];
+
+    // Material Style: A clean "Badge" look
+    node [shape=plaintext];
+
+    tumour [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2c3e50">
+            <TR><TD BGCOLOR="#34495e"><FONT COLOR="white"><B>Tumor Sample</B></FONT></TD></TR>
+            <TR><TD>250 mg</TD></TR>
+        </TABLE>>];
+
+    rna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#27ae60">
+            <TR><TD BGCOLOR="#2ecc71"><FONT COLOR="white"><B>Total RNA</B></FONT></TD></TR>
+            <TR><TD>1-5 µg</TD></TR>
+        </TABLE>>];
+
+    mrna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2980b9">
+            <TR><TD BGCOLOR="#3498db"><FONT COLOR="white"><B>mRNA</B></FONT></TD></TR>
+            <TR><TD>1-5% of Total</TD></TR>
+        </TABLE>>];
+
+    cdna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#8e44ad">
+            <TR><TD BGCOLOR="#9b59b6"><FONT COLOR="white"><B>cDNA Library</B></FONT></TD></TR>
+            <TR><TD>Ready for Seq</TD></TR>
+        </TABLE>>];
+
+    // Edges with Process Labels
+    // Using 'labeldistance' or just simple labels
+    tumour -> rna [label="  Isolation  ", penwidth=2];
+    rna -> mrna [label="  Enrichment  ", penwidth=2];
+    mrna -> cdna [label="  Reverse Transcription\n+ Library Prep  ", penwidth=2];
+}
