@@ -8,6 +8,7 @@ dependencies:
   - ipykernel
   - ipywidgets
   - itables
+  - jupyter-cache
   - jupyterlab
   - matplotlib
   - numpy

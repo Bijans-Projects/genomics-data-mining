@@ -2,47 +2,174 @@
 title: Genomics Data Mining
 ---
 
-## Expectations
+## Before we begin
 
-TECHNNICAL
+Statistics is the science and art of transforming data into actionable insight and sound judgement. 
 
-We expect a basic understanding of programming (we use Python, but any programming language will do).
+The data journey can be summarized as:
+```{dot}
+//| label: fig-data-journey
+//| fig-cap: "The Data Journey"
+//| fig-height: 100%
+//| fig-width: 100%
+
+digraph {
+    rankdir=LR;
+    Data -> Information -> Knowledge -> Wisdom
+}
+```
+
+**Data**
+: Raw facts, signals, or symbols, such as numbers or measurements which have little meaning in isolation.  
+    *Example: 98*  
+
+**Information**
+: Data that is processed, structured, and given context, making it meaningful.  
+    *Example: The patient's weight is 98 kg*  
+
+**Knowledge**
+: Information that is understood and applied through experience.  
+    *Example: The patient is overweight, requiring a higher dose of medication.*  
+
+**Wisdom**
+: Utilizing knowledge and experience to make sound judgements, decisions, and future-oriented actions.  
+    *Example: Deciding to combine the medical treatment with a personalized lifestyle intervention plan, recognizing that treating the root cause of the weight is more effective for the patient's long-term health than simply increasing their medication.*  
+
+### Expectations
+
+#### Statistics
+We expect a fundamental understanding of statistics including random distributions, sampling, linear regressions (simple and multivariate), bias, and variance. 
+
+#### Coding
+We expect a basic understanding of programming (we use Python, but any programming language will do).  
 Only functions that are created within this project will have documentation, otherwise you are expected to be able to read and understand what they are doing through their own official documentation.
 
-BIOLOGY
+#### Biology
+We are only looking at **human biology**, and expect you to know at least the following: 
 
-We are only looking at human biology, and expect you to know at least the following: 
+Genome
+: The complete set of DNA for a human
 
-- Genome
-  - Think of this as an entire library of all the pieces and instructions for a human
-  - The collection of all chromosomes
-- Chromosome
-  - Think of this as the organization method of the library
-  - One single DNA molecule, packaged tightly
-- Gene
-  - Think of this as individual recipes that make something, but just the ingredients list
-  - A section of DNA (or a section of RNA) that does something
-- DNA
-  - Think of this as the letters that are used for writing everything
-  - Made up of four chemicals
-  - Is a double-helix (i.e., two-strands)
-  - DNA is "the original" plans, so to keep them safe, copies are made; Transcription
-  - Copies are then used to do what the plans say
-- RNA
-  - Think of this as the copy ??? Not sure what to put here
-  - RNA is one-side of the DNA strand
-  - It is how instructions can be carried out; Instructions include "make a protein"; Translation 
-- mRNA
-- Protein
-  - Proteins are 
+Chromosome
+: A packaged unit of DNA
+: Humans have 46 chromosomes, which are made up of 23 pairs
+: Each chromosome is one single (long) DNA molecule
 
+DNA
+: The data (that stores biological information)
+: Has two strands
+: Made up of four chemicals
+    A: Adenine
+    C: Cytosine
+    G: Guanine
+    T: Thymine
+: Located primarily in a cell's nucleus
 
-- Humans are essentially meat-bags
-- We have different kinds of "meat" but they're all made up of cells
-- The types of cells and types of meats are "Cellular Biology" - we're not going to focus on this, at all
-- We are going to be looking at things that are smaller than cells, and basically how they impact cells (which then impact other things)
-- 
+Gene
+: A specific section of DNA that contains instructions to make something
 
+RNA
+: A temporary working copy a Gene
+: Only has one strand
+: Can leave the nucleus
+: There are many types of RNA
+
+Protein
+: Built from RNA instructions
+: Perform most functions of the cell
+
+Cell
+: The basic unit of life
+: Different cells use different genes (in different quantities)
+: All cells have the same DNA
+
+Tissue
+: A group of similar cells working together
+
+### Focus
+
+High-dimensional statistical inference is not a single analysis - it is a sequence of transformations, each introducing assumptions. 
+
+The conclusions are properties of the entire pipeline, not just the data.
+
+When our data has a lot of dimensions, and the relationships between them is complex, are our conclusions true to the underlying structure or consequences of our pipeline/decisions?
+
+:::{.column-screen-inset}
+
+<svg viewBox="0 0 1600 900" width="100%" style="max-width:1100px; display:block; margin: 2rem auto;">
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#161a22"/>
+      <stop offset="55%" stop-color="#0b0e14"/>
+      <stop offset="100%" stop-color="#05060a"/>
+    </radialGradient>
+
+    <!-- Soft spotlight -->
+    <radialGradient id="spot" cx="50%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Film grain -->
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
+      <feColorMatrix type="matrix" values="
+        1 0 0 0 0
+        0 1 0 0 0
+        0 0 1 0 0
+        0 0 0 0.12 0"/>
+    </filter>
+
+    <!-- Text glow -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Subtle vignette -->
+    <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+      <stop offset="65%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#spot)"/>
+  <rect width="1600" height="900" fill="url(#vig)"/>
+
+  <!-- Grain overlay -->
+  <rect width="1600" height="900" filter="url(#grain)" opacity="0.45"/>
+
+  <!-- Title -->
+  <g font-family="system-ui, -apple-system, Segoe UI, Inter, Arial" text-anchor="middle">
+    <text x="800" y="185" font-size="64" letter-spacing="8" fill="#cfd6e6" opacity="0.9">
+      ARE WE
+    </text>
+
+    <text x="800" y="360" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
+      DISCOVERING
+    </text>
+
+    <text x="800" y="470" font-size="46" letter-spacing="10" fill="#cfd6e6" opacity="0.95">
+      — OR —
+    </text>
+
+    <text x="800" y="645" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
+      CONSTRUCTING
+    </text>
+
+    <text x="800" y="760" font-size="44" letter-spacing="2" fill="#cfd6e6" opacity="0.95">
+      THE STRUCTURE WE SEE?
+    </text>
+  </g>
+</svg>
+:::
 
 
 ## Setup
@@ -58,8 +185,10 @@ html`
   <div>Data Acquisition</div>
   <div>Data Understanding</div>
   <div>Data Cleaning</div>
+  <div>Exploratory Analysis</div>
   <div>Dimension Reduction</div>
   <div>Statistical Modelling</div>
+  <div>Validation</div>
   <div>Conclusions</div>
 </div>
 `
@@ -158,6 +287,7 @@ import sklearn
 import yaml
 from IPython.display import Markdown, display
 from ydata_profiling import ProfileReport
+import matplotlib.pyplot as plt
 
 # --- Currently Testing ---
 import time
@@ -211,7 +341,7 @@ class CancerStudy:
 
 ### Parameters
 
-:::{.callout-important}
+:::{.callout-note}
 
 Most parameters are defined in the config.py file, and will eventually be part of environment variables
 
@@ -679,6 +809,15 @@ itables.show(
 
 ```
 
+:::{.column-screen-inset}
+<iframe 
+    src="https://oncotree.mskcc.org/?version=oncotree_latest_stable&field=CODE&search=LGG" 
+    width="100%" 
+    height="800px" 
+    style="border:none;">
+</iframe>
+:::
+
 #### Studies
 ```{python}
 #| label: analyze-data-acquisition-studies-api
@@ -800,7 +939,10 @@ def describe_dataframe_table(df: pd.DataFrame) -> pd.DataFrame:
 
 clinical_patient_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
 df_clinical_patients = pd.read_csv(clinical_patient_file, sep="\t", comment="#")
-itables.show(df_clinical_patients)
+itables.show(
+    df_clinical_patients,
+    maxBytes=0
+)
 
 described_df_clinical_patients = describe_dataframe_table(df_clinical_patients)
 itables.show(
@@ -821,9 +963,12 @@ itables.show(
 #| display: true
 
 
-clinical_sample_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
+clinical_sample_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_sample.txt")
 df_clinical_samples = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
-itables.show(df_clinical_samples)
+itables.show(
+    df_clinical_samples,
+    maxBytes=0
+)
 
 described_df_clinical_samples = describe_dataframe_table(df_clinical_samples)
 itables.show(described_df_clinical_samples)
@@ -831,9 +976,6 @@ itables.show(described_df_clinical_samples)
 ```
 
 ## MRNA Seq
-
-
-
 
 ```{python}
 #| label: analyze-data-acquisition-loading-mrna
@@ -843,7 +985,7 @@ itables.show(described_df_clinical_samples)
 mrna_seq_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_mrna_seq_v2_rsem.txt")
 df_mrna_seq = pd.read_csv(mrna_seq_file, sep="\t", comment="#")
 itables.show(
-    df_mrna_seq
+    df_mrna_seq,
 )
 
 described_df_mrna_seq = describe_dataframe_table(df_mrna_seq)
@@ -872,26 +1014,11 @@ itables.show(described_df_mrna_seq)
 :::
 ::::
 
-### TODO: data_clinical_sample.txt
-
-### TODO: Summarize the 3 df's
-
-### TODO:
-
-Thesse are some words in this section
-
-### TODO: DELETE ME
-
-```{python}
-
-timeline_sample_acquisition_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_timeline_sample_acquisition.txt")
-df_timeline_sample_acquisition = pd.read_csv(timeline_sample_acquisition_file, sep="\t", comment="#")
-
-
-df_timeline_sample_acquisition.groupby("METHOD_OF_SAMPLE_PROCUREMENT")["TUMOR_WEIGHT"].mean()
-
+```{dot}
+//| label: fig-dataModel
+//| fig-cap: cBioPortal Data Model
+//| file: dataModel.dot
 ```
-
 
 ## Data Understanding
 
@@ -906,6 +1033,279 @@ html`
   <div>Data Acquisition</div>
   <div class="current">Data Understanding</div>
   <div>Data Cleaning</div>
+  <div>Exploratory Analysis</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Validation</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+### Review
+1. Cancer is a disease of altered cellular behaviour
+2. Cellular behaviour is driven by proteins
+3. Proteins are made from mRNA
+4. mRNA reflects gene activity and strength
+
+Therefore, measuring mRNA gives us a quantitative snapshot of cellular behaviour.
+
+### RNA Sequencing
+Goal: From a tissue sample of a tumor, find out which genes are being expressed and how much
+
+1. Prepare a sequence library
+2. Sequence
+3. Prepare data
+
+#### Part 1: Prepare a sequence library
+
+Input: Tissue Sample
+
+```{dot}
+//| label: fig-rnaSeq_01_prepLibrary
+//| fig-cap: RNA Sequencing Part 1 Prepare a sequence library
+//| file: rnaSeq_01_prepLibrary.dot
+```
+
+Output: cDNA Fragments
+
+#### Part 2: Sequence
+
+Input: cDNA Fragments
+
+1. Put fragment on Flow cell
+2. Probe each nucleotide
+3. Repeated until the entire fragment is probed
+
+Output: FAST file, which has the sequence of bases for each fragment and a quality score per base
+
+#### Part 3: Prepare Data
+
+Input: FAST file
+
+1. Align the high quality reads to a transcript / gene (probabilistic)
+
+Output: Counts of fragments to transcripts
+
+
+### WHAT DOES THIS NUMBER TELL US? 
+
+Each number represents a gene's relative expression level. We can compare both across the samples, and across genes. 
+
+
+## Upper Quartile (UQ) Normalization — Inspection
+
+Upper Quartile normalization rescales each sample so that the **75th percentile of expression values is aligned across samples**.
+
+If the data are already UQ-normalized, we expect:
+
+- The 75th percentile values to be very similar across samples.
+- Expression distributions to be roughly aligned (on a log scale).
+- Low variability in the per-sample UQ values.
+
+### Compute the Upper Quartile per Sample
+
+```{python}
+# --- Build a numeric matrix X with samples in columns ---
+df = df_mrna_seq.copy()
+
+# Use Hugo_Symbol as index if present; otherwise keep default index.
+if "Hugo_Symbol" in df.columns:
+    df = df.set_index("Hugo_Symbol")
+
+if "Entrez_Gene_Id" in df.columns:
+    df = df.drop(columns=["Entrez_Gene_Id"])
+
+# If you have other non-sample identifier columns, drop them here as needed.
+# Example:
+# for col in ["Entrez_Gene_Id", "Entrez_Gene_ID", "Entrez_Gene_id", "Entrez_GeneID"]:
+#     if col in df.columns:
+#         df = df.drop(columns=[col])
+
+# Coerce to numeric; non-numeric entries become NaN
+X = df.apply(pd.to_numeric, errors="coerce")
+
+def uq_nonzero(col: pd.Series) -> float:
+    """75th percentile excluding zeros and NaNs. Returns NaN if empty."""
+    v = col.dropna()
+    v = v[v > 0]
+    if len(v) == 0:
+        return np.nan
+    return float(np.quantile(v, 0.75))
+
+uq = X.apply(uq_nonzero, axis=0)
+uq
+```
+
+### Distribution of UQ Across Samples
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq.dropna().values, bins=40)
+plt.title("Per-sample Upper Quartile (75th percentile)")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+#### Interpretation
+If the data are properly UQ-normalized:
+- The histogram should be tightly concentrated
+- Large spread would indicate remaining library-size differences
+
+### Sorted UQ Values
+
+```{python}
+uq_sorted = np.sort(uq.dropna().values)
+
+plt.figure(figsize=(6,4))
+plt.plot(uq_sorted)
+plt.title("Sorted Per-sample UQ Values")
+plt.xlabel("Samples (sorted)")
+plt.ylabel("UQ value")
+plt.tight_layout()
+plt.show()
+```
+
+#### Interpretation
+- A nearly flat line indicated consistent normalization
+- A steep slope suggests uneven scaling across samples
+
+### Expression Distribution Comparison (log scale)
+We compare a subset of samples to inspect distribution alignment
+
+```{python}
+sample_cols = list(X.columns[:8])  # change 8 to any small number you want
+
+plt.figure(figsize=(8,5))
+for col in sample_cols:
+    v = X[col].dropna()
+    v = v[v > 0]
+    if len(v) == 0:
+        continue
+    plt.hist(np.log10(v), bins=60, alpha=0.3)
+
+plt.title("Log10(Expression) Distributions (Selected Samples)")
+plt.xlabel("log10(expression)")
+plt.ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+#### Interpretation
+After UQ normalization
+- Distributions should overlap substantially
+- Major horizontal shifts would suggest remaining depth differences
+- Perfect overlap is not expected (i.e., biological variation remains)
+
+### Coefficient of Variation of UQ
+
+```{python}
+uq_clean = uq.dropna()
+cv = uq_clean.std() / uq_clean.mean()
+cv
+```
+
+The coefficient of variation summarized how tightly aligned the UQ values are
+- Small: strong normalization consistency
+- Large: residual scaling differences
+
+## Demonstrating what UQ normalization fixes
+
+Since we don't have raw counts, we simulate uneven sequencing depth by artificially scaling samples. 
+
+### Create Artificial Library Size Differences
+
+```{python}
+rng = np.random.default_rng(42)
+
+fake_scale = pd.Series(
+    rng.uniform(0.5, 2.0, size=X.shape[1]),
+    index=X.columns,
+    name="fake_scale"
+)
+
+X_fake_raw = X.mul(fake_scale, axis=1)
+uq_fake = X_fake_raw.apply(uq_nonzero, axis=0)
+uq_fake
+```
+
+#### Distortion
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq_fake.dropna().values, bins=40)
+plt.title("Artificially Distorted Data (UQ Spread Out)")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+Multiplicative scaling causes the 75th percentile values to diverge.
+
+#### Reapply UQ Normalization
+
+```{python}
+target = np.nanmedian(uq_fake.values)
+
+X_fake_uq = X_fake_raw.div(uq_fake, axis=1) * target
+uq_after = X_fake_uq.apply(uq_nonzero, axis=0)
+uq_after
+```
+
+#### Correction
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq_after.dropna().values, bins=40)
+plt.title("After UQ Normalization (UQ Realigned)")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+### Compare Before vs After
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq_fake.dropna().values, bins=40, alpha=0.5, label="Distorted")
+plt.hist(uq_after.dropna().values, bins=40, alpha=0.5, label="After UQ")
+plt.legend()
+plt.title("Effect of UQ Normalization")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+
+Overall UQ normalization: 
+- Corrects multiplicative library-size effects
+- Anchors the 75th percentile expression level
+- Assumes most genes are not dramatically differntially expressed
+- Does not remove biological variation
+
+
+
+
+
+
+## Data Cleaning
+
+```{ojs}
+//| label: section-div-04
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div class="current">Data Cleaning</div>
   <div>Dimension Reduction</div>
   <div>Statistical Modelling</div>
   <div>Conclusions</div>
@@ -914,16 +1314,236 @@ html`
  
 ```
 
-### Review
-DNA has many Genes (i.e., regions)
-A gene is a part of the DNA that does something, and is defined by specific coordinates (one start, and one end)
-In order for those recipes to do anything, the DNA is copied to RNA, in a process called transcription.
-This RNA is called "Pre-mRNA (Precursor mRNA or heterogenous nuclear RNA: hnRNA)"
-The Pre-mRNA is processed by removing certain parts (slicing), adding stuff to one end (capping), and adding other stuff to the other end (polyadenylation), which then makes it "Mature mRNA" (we'll just call this mRNA from now). 
-... in cellular biology, this would then go and do things, perhaps make proteins ... 
 
-### RNA Sequencing
-Goal: From a tissue sample of a tumor, find out how many genes are being expressed
+
+## Dimension Reduction
+
+```{ojs}
+//| label: section-div-05
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div">Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div class="current">Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+
+
+
+## Statistical Modelling
+
+```{ojs}
+//| label: section-div-06
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div class="current">Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+## Conclusions
+
+```{ojs}
+//| label: section-div-07
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div class="current">Conclusions</div>
+</div>
+`
+ 
+```
+
+## Other stuff
+
+```{python}
+%matplotlib inline
+def upper_quartile_nonzero(x: pd.Series, q: float = 0.75) -> float:
+    """Upper quartile excluding zeros/NaNs. Returns NaN if too few nonzero values."""
+    v = x.to_numpy(dtype=float)
+    v = v[np.isfinite(v)]
+    v = v[v > 0]
+    if v.size < 10:
+        return np.nan
+    return float(np.quantile(v, q))
+
+df = df_mrna_seq.copy()
+
+# 1) Put gene identifiers in the index (optional but nice)
+df = df.set_index(["Hugo_Symbol", "Entrez_Gene_Id"])
+
+# 2) Sample columns are now all remaining columns
+sample_cols = df.columns
+
+# 3) Coerce sample data to numeric (handles strings/object dtype safely)
+X = df.apply(pd.to_numeric, errors="coerce")  # same shape as df, but numeric/NaN
+
+# Helper: get nonzero values from one sample column
+def nonzero_vals(col: pd.Series):
+    v = col.dropna()
+    v = v[v > 0]
+    return v.values
+
+uq = X.apply(lambda s: np.quantile(nonzero_vals(s), 0.75) if nonzero_vals(s).size else np.nan, axis=0)
+```
+
+
+## Looking at some data
+### Upper quartile per sample
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq.dropna().values, bins=40)
+plt.title("Per-sample Upper Quartile (75th percentile, nonzero)")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+### Sorted UQ line plot
+```{python}
+uq_sorted = np.sort(uq.dropna().values)
+
+plt.figure(figsize=(6,4))
+plt.plot(uq_sorted)
+plt.title("Sorted per-sample UQ values")
+plt.xlabel("Samples (sorted)")
+plt.ylabel("UQ value")
+plt.tight_layout()
+plt.show()
+```
+
+
+### Compare distributions across some samples (log10)
+```{python}
+chosen = list(sample_cols[:8])  # pick any 8 you want
+
+plt.figure(figsize=(8,5))
+for col in chosen:
+    v = nonzero_vals(X[col])
+    if v.size == 0:
+        continue
+    plt.hist(np.log10(v), bins=60, alpha=0.3)
+
+plt.title("log10(Expression) distributions (selected samples)")
+plt.xlabel("log10(expression)")
+plt.ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+### Coefficient of variation
+```{python}
+uq_clean = uq.dropna()
+cv = uq_clean.std() / uq_clean.mean()
+cv
+```
+
+
+## Exploration
+```{python}
+df = df_mrna_seq.copy()
+df = df.set_index("Hugo_Symbol")
+
+X = df.apply(pd.to_numeric, errors="coerce")
+
+def uq_nonzero(col):
+    v = col.dropna()
+    v = v[v > 0]
+    if len(v) == 0:
+        return np.nan
+    return np.quantile(v, 0.75)
+
+uq_original = X.apply(uq_nonzero, axis=0)
+
+
+# Artificially create fake raw counts
+
+rng = np.random.default_rng(42)
+
+fake_scale = pd.Series(
+    rng.uniform(0.5, 2.0, size=X.shape[1]),
+    index=X.columns
+)
+
+X_fake_raw = X.mul(fake_scale, axis=1)
+
+
+
+
+
+uq_fake = X_fake_raw.apply(uq_nonzero, axis=0)
+
+plt.figure(figsize=(6,4))
+plt.hist(uq_fake.dropna().values, bins=40)
+plt.title("Fake Raw Data: UQ Spread Out")
+plt.xlabel("UQ value")
+plt.ylabel("Samples")
+plt.tight_layout()
+plt.show()
+
+
+
+
+target = np.nanmedian(uq_fake.values)
+
+X_fake_uq = X_fake_raw.div(uq_fake, axis=1) * target
+
+
+
+
+uq_after = X_fake_uq.apply(uq_nonzero, axis=0)
+
+plt.figure(figsize=(6,4))
+plt.hist(uq_after.dropna().values, bins=40)
+plt.title("After UQ Normalization: UQ Tight Again")
+plt.xlabel("UQ value")
+plt.ylabel("Samples")
+plt.tight_layout()
+plt.show()
+
+
+
+
+plt.figure(figsize=(6,4))
+plt.hist(uq_fake.dropna().values, bins=40, alpha=0.5, label="Fake Raw")
+plt.hist(uq_after.dropna().values, bins=40, alpha=0.5, label="After UQ")
+plt.legend()
+plt.title("Effect of UQ Normalization")
+plt.xlabel("UQ value")
+plt.ylabel("Samples")
+plt.tight_layout()
+plt.show()
+```
 
 1. Isolate
    1. Tumor Sample --> RNA
@@ -1112,99 +1732,6 @@ What do the numbers in data_mrna_seq_v2_rsem.txt mean?
 ```{python}
 1
 ```
-
-
-## Data Cleaning
-
-```{ojs}
-//| label: section-div-04
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div class="current">Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
-
-
-
-## Dimension Reduction
-
-```{ojs}
-//| label: section-div-05
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div">Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div class="current">Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
-
-
-
-
-## Statistical Modelling
-
-```{ojs}
-//| label: section-div-06
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div class="current">Statistical Modelling</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
-
-## Conclusions
-
-```{ojs}
-//| label: section-div-07
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div class="current">Conclusions</div>
-</div>
-`
- 
-```
-
-
-
 
 
 🧬 From Shredded Spells to Gene Expression
@@ -1498,3 +2025,34 @@ digraph BioHybrid {
     rna -> mrna [label="  Enrichment  ", penwidth=2];
     mrna -> cdna [label="  Reverse Transcription\n+ Library Prep  ", penwidth=2];
 }
+
+## New Grid for things
+
+```{ojs}
+ag = require("https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js")
+
+gridOptions = ({
+  rowData: [
+    { make: "Tesla", model: "Model Y", price: 64950, electric: true },
+    { make: "Ford", model: "F-Series", price: 33850, electric: false },
+    { make: "Toyota", model: "Corolla", price: 29600, electric: false },
+    { make: "Mercedes", model: "EQA", price: 48890, electric: true },
+    { make: "Fiat", model: "500", price: 15774, electric: false },
+    { make: "Nissan", model: "Juke", price: 20675, electric: false }
+  ],
+  columnDefs: [
+    { field: "make" },
+    { field: "model" },
+    { field: "price" },
+    { field: "electric" }
+  ]
+})
+
+gridApi = ag.createGrid(myGrid, gridOptions)
+gridApi
+```
+
+
+:::{#myGrid .ag-theme-quartz style="height: 500px;"}
+
+:::
