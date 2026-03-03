@@ -15,6 +15,11 @@ The data journey can be summarized as:
 
 digraph {
     rankdir=LR;
+    
+    graph[class="dot-default-graph"]
+    node [class="dot-default-node"]
+    edge [class="dot-default-edge"]
+
     Data -> Information -> Knowledge -> Wisdom
 }
 ```

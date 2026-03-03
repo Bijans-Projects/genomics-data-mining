@@ -8,21 +8,42 @@ project:
     - index.qmd
 
 website:
-  title: "quarto"
+  site-url: https://bijans-projects.github.io/genomics-data-mining
+  repo-url: https://github.com/Bijans-Projects/genomics-data-mining
+  issue-url: https://github.com/Bijans-Projects/genomics-data-mining/issues/new/choose
+  repo-actions: [edit, source, issue]
+  search:
+    show-item-context: tree
+    type: overlay
+  page-footer:
+    left: |
+      Made up
+  title: "Bijans Projects"
+  reader-mode: true
   navbar:
     left:
       - index.qmd
+    tools:
+      - icon: github
+        href: https://github.com/Bijans-Projects
+        text: Bijans Projects GitHub
 
 jupyter: genomics-data-mining
 
 format:
   html:
-    code-fold: true
+    anchor-sections: true
+    code-fold: show
+    code-overflow: wrap
     code-tools: true
+    respect-user-color-scheme: true
     theme:
-      - cosmo
-      - brand
+      light: flatly
+      dark: darkly
     css: styles.css
     toc: true
     grid:
       body-width: 2000px
+    smooth-scroll: true
+    link-external-icon: true
+    link-external-newwindow: true

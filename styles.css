@@ -21,3 +21,31 @@
     align-items: center;
     justify-content: center;
 }
+
+/* GraphViz DOT style */
+/* Graph background */
+.dot-default-graph > polygon {
+  fill: var(--bs-body-bg);
+  stroke: transparent;
+}
+
+/* Nodes */
+.dot-default-node ellipse {
+  fill: var(--bs-body-bg);
+  stroke: var(--bs-body-color);
+}
+
+.dot-default-node text {
+  fill: var(--bs-body-color);
+}
+
+/* Edges */
+.dot-default-edge path {
+  stroke: var(--bs-body-color);
+  fill: none;
+}
+
+.dot-default-edge polygon {
+  fill: var(--bs-body-color);
+  stroke: var(--bs-body-color);
+}
