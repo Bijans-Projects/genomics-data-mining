@@ -99,82 +99,83 @@ The conclusions are properties of the entire pipeline, not just the data.
 
 When our data has a lot of dimensions, and the relationships between them is complex, are our conclusions true to the underlying structure or consequences of our pipeline/decisions?
 
-:::{.column-screen-inset}
+```{=html}
+<div class="column-screen-inset">
+    <svg viewBox="0 0 1600 900" width="100%" style="max-width:1100px; display:block; margin: 2rem auto;">
+    <defs>
+        <!-- Background gradient -->
+        <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+        <stop offset="0%" stop-color="#161a22"/>
+        <stop offset="55%" stop-color="#0b0e14"/>
+        <stop offset="100%" stop-color="#05060a"/>
+        </radialGradient>
 
-<svg viewBox="0 0 1600 900" width="100%" style="max-width:1100px; display:block; margin: 2rem auto;">
-  <defs>
-    <!-- Background gradient -->
-    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
-      <stop offset="0%" stop-color="#161a22"/>
-      <stop offset="55%" stop-color="#0b0e14"/>
-      <stop offset="100%" stop-color="#05060a"/>
-    </radialGradient>
+        <!-- Soft spotlight -->
+        <radialGradient id="spot" cx="50%" cy="25%" r="60%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+        <stop offset="60%" stop-color="#ffffff" stop-opacity="0.03"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
 
-    <!-- Soft spotlight -->
-    <radialGradient id="spot" cx="50%" cy="25%" r="60%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
-      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.03"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
+        <!-- Film grain -->
+        <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
+        <feColorMatrix type="matrix" values="
+            1 0 0 0 0
+            0 1 0 0 0
+            0 0 1 0 0
+            0 0 0 0.12 0"/>
+        </filter>
 
-    <!-- Film grain -->
-    <filter id="grain">
-      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
-      <feColorMatrix type="matrix" values="
-        1 0 0 0 0
-        0 1 0 0 0
-        0 0 1 0 0
-        0 0 0 0.12 0"/>
-    </filter>
+        <!-- Text glow -->
+        <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+        </filter>
 
-    <!-- Text glow -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
+        <!-- Subtle vignette -->
+        <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+        <stop offset="65%" stop-color="#000" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+        </radialGradient>
+    </defs>
 
-    <!-- Subtle vignette -->
-    <radialGradient id="vig" cx="50%" cy="50%" r="70%">
-      <stop offset="65%" stop-color="#000" stop-opacity="0"/>
-      <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
-    </radialGradient>
-  </defs>
+    <!-- Background -->
+    <rect width="1600" height="900" fill="url(#bg)"/>
+    <rect width="1600" height="900" fill="url(#spot)"/>
+    <rect width="1600" height="900" fill="url(#vig)"/>
 
-  <!-- Background -->
-  <rect width="1600" height="900" fill="url(#bg)"/>
-  <rect width="1600" height="900" fill="url(#spot)"/>
-  <rect width="1600" height="900" fill="url(#vig)"/>
+    <!-- Grain overlay -->
+    <rect width="1600" height="900" filter="url(#grain)" opacity="0.45"/>
 
-  <!-- Grain overlay -->
-  <rect width="1600" height="900" filter="url(#grain)" opacity="0.45"/>
+    <!-- Title -->
+    <g font-family="system-ui, -apple-system, Segoe UI, Inter, Arial" text-anchor="middle">
+        <text x="800" y="185" font-size="64" letter-spacing="8" fill="#cfd6e6" opacity="0.9">
+        ARE WE
+        </text>
 
-  <!-- Title -->
-  <g font-family="system-ui, -apple-system, Segoe UI, Inter, Arial" text-anchor="middle">
-    <text x="800" y="185" font-size="64" letter-spacing="8" fill="#cfd6e6" opacity="0.9">
-      ARE WE
-    </text>
+        <text x="800" y="360" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
+        DISCOVERING
+        </text>
 
-    <text x="800" y="360" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
-      DISCOVERING
-    </text>
+        <text x="800" y="470" font-size="46" letter-spacing="10" fill="#cfd6e6" opacity="0.95">
+        — OR —
+        </text>
 
-    <text x="800" y="470" font-size="46" letter-spacing="10" fill="#cfd6e6" opacity="0.95">
-      — OR —
-    </text>
+        <text x="800" y="645" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
+        CONSTRUCTING
+        </text>
 
-    <text x="800" y="645" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
-      CONSTRUCTING
-    </text>
-
-    <text x="800" y="760" font-size="44" letter-spacing="2" fill="#cfd6e6" opacity="0.95">
-      THE STRUCTURE WE SEE?
-    </text>
-  </g>
-</svg>
-:::
+        <text x="800" y="760" font-size="44" letter-spacing="2" fill="#cfd6e6" opacity="0.95">
+        THE STRUCTURE WE SEE?
+        </text>
+    </g>
+    </svg>
+</div>
+```
 
 
 ## Setup
@@ -1169,6 +1170,7 @@ plt.plot(uq_sorted)
 plt.title("Sorted Per-sample UQ Values")
 plt.xlabel("Samples (sorted)")
 plt.ylabel("UQ value")
+plt.ylim(0, 1250)
 plt.tight_layout()
 plt.show()
 ```
@@ -1319,7 +1321,87 @@ html`
  
 ```
 
+```{python}
 
+## TODO: DELETE, just for simple typing
+df = df_mrna_seq
+
+## TODO: This is what we'll eventually use
+df_mrna_seq_entrez_only = df_mrna_seq
+df_mrna_seq_entrez_only = df_mrna_seq_entrez_only.drop(columns="Hugo_Symbol")
+df_mrna_seq_entrez_only.set_index('Entrez_Gene_Id')
+
+total_rows = df_mrna_seq_entrez_only.shape[0]
+total_cols = df_mrna_seq_entrez_only.shape[1]
+
+## just for simplicity in typing
+## df = df_mrna_seq_entrez_only
+
+# 1. Check index column: Must be unique
+
+len(df['Entrez_Gene_Id'].unique())           # Expected count of unique values = total_rows
+len(df['Hugo_Symbol'].unique())              # Expected count of unique values = total_rows
+
+## THEY ARE NOT UNIQUE ... let's investigate
+
+########## Duplicated Entrez ##########
+duplicated_entrez = df[df.duplicated(subset=['Entrez_Gene_Id'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Entrez_Gene_Id')
+duplicated_entrez_distinct_count = duplicated_entrez['Entrez_Gene_Id'].nunique()
+print(f"Number of distinct Entrez Gene Id's: {duplicated_entrez_distinct_count}")
+## ^^ We see that an entrez gene id has more than one Hugo symbol ... let's check if the values we get are the same or not
+duplicated_entrez_samples = df.iloc[duplicated_entrez.index,2:].transpose()
+duplicated_entrez_described = df.iloc[duplicated_entrez.index,2:].transpose().describe().transpose()
+duplicated_entrez_described = duplicated_entrez.merge(duplicated_entrez_described, left_index=True, right_index=True)
+## OMG ... so ... there's this weird problem ... there are these entrez gene ID's that are the same ... but the hugo are different ... and they show different values (summmary stats) ... apparently GPT is telling me that in the modern world we use the entrez ID and merge the data ... 
+
+
+
+
+
+########## Duplicated Hugo ##########
+duplicated_hugo = df[df.duplicated(subset=['Hugo_Symbol'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Hugo_Symbol')
+## ^^ We see that an entrez gene id has more than one Hugo symbol ... let's check if the values we get are the same or not
+duplicated_hugo_described = df.iloc[duplicated_hugo.index,2:].transpose().describe().transpose()
+duplicated_hugo_described = duplicated_hugo.merge(duplicated_hugo_described, left_index=True, right_index=True)
+
+
+
+
+
+########## Duplicated Entrez AND Hugo ##########
+duplicated_entrez_and_hugo = df[df.duplicated(subset=['Entrez_Gene_Id', 'Hugo_Symbol'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Entrez_Gene_Id')
+# 
+
+
+```
+
+
+```{python}
+
+df = df.set_index("Entrez_Gene_Id")
+duplicated_entrez_samples = df.iloc[duplicated_entrez.index,2:].transpose()
+
+df = duplicated_entrez_samples
+for col_name in dict.fromkeys(df.columns):
+    sub = df.loc[:, df.columns == col_name]
+
+    data = [sub.iloc[:, i].to_numpy(dtype=float) for i in range(sub.shape[1])]
+
+    plt.boxplot(data)
+    plt.title(f"Boxplot for: {col_name}  (repeats: {sub.shape[1]})")
+    plt.xlabel("repeat #")
+    plt.ylabel("value")
+    plt.grid(True, axis="y", alpha=0.3)
+    plt.show()
+
+# plt.boxplot(duplicated_entrez_samples)
+# plt.title("Boxplot")
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.grid(True)
+# plt.show()
+
+```
 
 ## Dimension Reduction
 

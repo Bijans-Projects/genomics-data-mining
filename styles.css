@@ -40,12 +40,12 @@
 }
 
 /* Edges */
-.dot-default-edge path {
+.dot-default-edge path { /* the line segment */
   stroke: var(--bs-body-color);
   fill: none;
 }
 
-.dot-default-edge polygon {
+.dot-default-edge polygon { /* the arrow head */
   fill: var(--bs-body-color);
-  stroke: var(--bs-body-color);
+  stroke: none;
 }
