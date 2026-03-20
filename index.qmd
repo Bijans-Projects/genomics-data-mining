@@ -4,6 +4,13 @@ title: Genomics Data Mining
 
 ## Before we begin
 
+In order to follow along, you must have followed the setup instructions. 
+
+### Expectations
+
+#### Statistics
+We expect a fundamental understanding of statistics including random distributions, sampling, linear regressions (simple and multivariate), bias, and variance.
+
 Statistics is the science and art of transforming data into actionable insight and sound judgement. 
 
 The data journey can be summarized as:
@@ -39,11 +46,6 @@ digraph {
 **Wisdom**
 : Utilizing knowledge and experience to make sound judgements, decisions, and future-oriented actions.  
     *Example: Deciding to combine the medical treatment with a personalized lifestyle intervention plan, recognizing that treating the root cause of the weight is more effective for the patient's long-term health than simply increasing their medication.*  
-
-### Expectations
-
-#### Statistics
-We expect a fundamental understanding of statistics including random distributions, sampling, linear regressions (simple and multivariate), bias, and variance. 
 
 #### Coding
 We expect a basic understanding of programming (we use Python, but any programming language will do).  
