@@ -101,6 +101,20 @@ The conclusions are properties of the entire pipeline, not just the data.
 
 When our data has a lot of dimensions, and the relationships between them is complex, are our conclusions true to the underlying structure or consequences of our pipeline/decisions?
 
+In order to compare if these decisions resulted in different conclusions, we will consider gene expression in determening cancer subtype (i.e., classification) under different pipeline decisions, using Accuracy.
+For example: 
+
+Pipeline 1: 
+- Data cleansing: Removed all genes with a gene expression < 30
+- Dimensional Reduction: PCA (50 components)
+
+Once classification has been done, we will compare the results over many repeated trials (?? are these methods deterministic - I don't think so ). 
+
+TODO: Investigate if paired design makes sense. PRoblem: simple splits are simple. But the comparisons grow exponentially (2^n, where n is every time we have a difference)
+
+
+
+
 ```{=html}
 <div class="column-screen-inset">
     <svg viewBox="0 0 1600 900" width="100%" style="max-width:1100px; display:block; margin: 2rem auto;">
@@ -294,7 +308,6 @@ import requests
 import sklearn
 import yaml
 from IPython.display import Markdown, display
-from ydata_profiling import ProfileReport
 import matplotlib.pyplot as plt
 
 # --- Currently Testing ---
@@ -439,6 +452,1664 @@ def extract_dataset(file: Path, /, *, folder: Path = config.DEFAULT_DATASET_EXTR
 
     return extract_path
 
+
+
+
+
+## Newest exploration 
+
+
+
+
+# =========================================================
+# figure saving / cleanup
+# =========================================================
+def slugify(text: str) -> str:
+    text = str(text).strip().lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[-\s]+", "_", text)
+    return text
+
+
+def finalize_figure(
+    fig,
+    title,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    """
+    Save, optionally show, then optionally close a matplotlib figure.
+    Returns saved filepath as string, else None.
+    """
+    saved_path = None
+
+    if save and output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{slugify(title)}.{ext}"
+        saved_path = output_dir / filename
+        fig.savefig(saved_path, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    if close:
+        plt.close(fig)
+
+    return str(saved_path) if saved_path is not None else None
+
+
+# =========================================================
+# id / metadata helpers
+# =========================================================
+
+## Replaced with simply using the original data with index & Hugo_Symbol & Entrez_Gene_Id as the index columns. 
+# def add_unique_gene_row_id(
+#     df,
+#     hugo_col="Hugo_Symbol",
+#     entrez_col="Entrez_Gene_Id",
+#     new_col="gene_row_id",
+#     pad=4,
+# ):
+#     """
+#     Adds a unique row identifier column like:
+#       TP53__7157__0001
+#       TP53__7157__0002
+
+#     Works even if Hugo/Entrez are duplicated.
+#     """
+#     out = df.copy()
+
+#     hugo = out[hugo_col].astype(str).fillna("NA")
+#     entrez = out[entrez_col].astype(str).fillna("NA")
+
+#     base = hugo + "__" + entrez
+#     seq = base.groupby(base).cumcount() + 1
+#     out[new_col] = base + "__" + seq.astype(str).str.zfill(pad)
+
+#     return out
+
+
+def set_expression_matrix_index(
+    df
+):
+    """
+    Returns a copy of the df with multi-column index using the original index value (starting from 0), Hugo_Symbol (replacing empty/na/nan values with 'No-Hugo'), and Entrez_Gene_Id (converting to a Nullable Integer type).
+    """
+    out = df.copy()
+    out["Hugo_Symbol"] = out["Hugo_Symbol"].fillna("No-Hugo")
+    out["Entrez_Gene_Id"] = out["Entrez_Gene_Id"].astype('Int64').astype(object)
+    out = out.reset_index(drop=True).set_index(["Hugo_Symbol","Entrez_Gene_Id"], append=True)
+    return out
+
+
+def wide_expression_to_long(
+    X,
+    sample_metadata=None,
+    gene_id_name="gene_id",
+    sample_id_name="sample_id",
+    value_name="expression",
+):
+    """
+    Converts a genes x samples matrix to long format.
+    """
+    long_df = (
+        X.reset_index(names=gene_id_name)
+         .melt(id_vars=gene_id_name, var_name=sample_id_name, value_name=value_name)
+    )
+
+    if sample_metadata is not None:
+        sm = sample_metadata.copy()
+        if sample_id_name not in sm.columns:
+            raise ValueError(f"sample_metadata must contain column '{sample_id_name}'")
+        long_df = long_df.merge(sm, on=sample_id_name, how="left")
+
+    return long_df
+
+
+# =========================================================
+# stats helpers
+# =========================================================
+def resolve_genes(X, genes=None):
+    if genes is None:
+        return list(X.index)
+    return list(genes)
+
+
+def safe_mean(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.mean(x) if len(x) > 0 else np.nan
+
+
+def safe_median(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.median(x) if len(x) > 0 else np.nan
+
+
+def safe_sd(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.std(x, ddof=1) if len(x) >= 2 else np.nan
+
+
+def safe_cv(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) < 2:
+        return np.nan
+    mu = np.mean(x)
+    sd = np.std(x, ddof=1)
+    return sd / mu if mu > 0 else np.nan
+
+
+def safe_rank_str(rank_val, n_all):
+    if np.isfinite(rank_val):
+        return f"{int(round(rank_val))}/{n_all}"
+    return "NA"
+
+
+def safe_pct_str(pct_val):
+    if np.isfinite(pct_val):
+        return f"{pct_val:.1f}"
+    return "NA"
+
+
+def ecdf_values(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) == 0:
+        return np.array([]), np.array([])
+    x = np.sort(x)
+    y = np.arange(1, len(x) + 1) / len(x)
+    return x, y
+
+
+# =========================================================
+# all-gene metrics
+# =========================================================
+def compute_all_gene_metrics(X):
+    rows = []
+
+    for gene in X.index:
+        raw = X.loc[gene].to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        pos = raw[raw > 0]
+
+        zero_count = int(np.sum(raw == 0))
+        zero_prop = zero_count / len(raw) if len(raw) > 0 else np.nan
+
+        rows.append({
+            "gene": gene,
+            "zero_count": zero_count,
+            "zero_prop": zero_prop,
+
+            "mean_all": safe_mean(raw),
+            "median_all": safe_median(raw),
+            "sd_all": safe_sd(raw),
+            "cv_all": safe_cv(raw),
+
+            "mean_pos": safe_mean(pos),
+            "median_pos": safe_median(pos),
+            "sd_pos": safe_sd(pos),
+            "cv_pos": safe_cv(pos),
+        })
+
+    all_metrics = pd.DataFrame(rows).set_index("gene")
+
+    for metric in ["median_all", "median_pos", "sd_all", "sd_pos", "cv_all", "cv_pos"]:
+        s = all_metrics[metric]
+        all_metrics[f"{metric}_rank"] = s.rank(method="average", ascending=True)
+        all_metrics[f"{metric}_pct"] = s.rank(method="average", pct=True, ascending=True) * 100
+
+    return all_metrics
+
+
+def collect_subset_rows(X, genes, all_metrics):
+    rows = []
+
+    for gene in genes:
+        raw = pd.to_numeric(X.loc[gene], errors="coerce").to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        pos = raw[raw > 0]
+
+        rr = {
+            "gene": gene,
+            "vals_all": raw,
+            "vals_pos": pos,
+            "vals_all_log1p": np.log1p(raw),
+            "vals_pos_log1p": np.log1p(pos),
+        }
+
+        rr.update(all_metrics.loc[[gene]].iloc[0].to_dict())
+        rows.append(rr)
+
+    return rows
+
+
+# =========================================================
+# plotting: boxplots
+# =========================================================
+def plot_boxplots_single_version(
+    rows,
+    value_key,
+    metric_key,
+    xlabel,
+    title,
+    n_all_genes,
+    global_metric_value=None,
+    global_metric_label=None,
+    xlim=None,
+    row_height=0.30,
+    figsize_width=11,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    rows_sorted = sorted(
+        rows,
+        key=lambda r: np.nan_to_num(r.get(metric_key, np.nan), nan=np.inf)
+    )
+
+    n = len(rows_sorted)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(
+        nrows=n,
+        ncols=1,
+        figsize=(figsize_width, fig_height),
+        sharex=True
+    )
+    if n == 1:
+        axes = [axes]
+
+    for ax, row in zip(axes, rows_sorted):
+        vals = row[value_key]
+
+        if len(vals) > 0:
+            ax.boxplot(vals, vert=False, widths=0.6, showfliers=True)
+
+        rank_val = row.get(f"{metric_key}_rank", np.nan)
+        pct_val = row.get(f"{metric_key}_pct", np.nan)
+
+        label = (
+            f"{row['gene']}  "
+            f"(zeros={row['zero_count']}, "
+            f"rank={safe_rank_str(rank_val, n_all_genes)}, "
+            f"pct={safe_pct_str(pct_val)})"
+        )
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([label], fontsize=7)
+
+        if global_metric_value is not None and np.isfinite(global_metric_value):
+            ax.axvline(global_metric_value, color="red", linewidth=1.2, alpha=0.9)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+
+        if xlim is not None:
+            ax.set_xlim(*xlim)
+
+    if global_metric_value is not None and np.isfinite(global_metric_value):
+        axes[0].text(
+            global_metric_value,
+            1.35,
+            global_metric_label if global_metric_label else f"global={global_metric_value:.2f}",
+            color="red",
+            fontsize=8,
+            ha="left",
+            va="bottom",
+        )
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    fig.tight_layout()
+
+    return finalize_figure(
+        fig=fig,
+        title=title,
+        output_dir=output_dir,
+        save=save,
+        show=show,
+        close=close,
+        dpi=dpi,
+        ext=ext,
+    )
+
+
+# =========================================================
+# plotting: one-number metrics
+# =========================================================
+def plot_metric_single(
+    rows,
+    metric_key,
+    xlabel,
+    title,
+    n_all_genes,
+    global_metric_value=None,
+    global_metric_label=None,
+    standardize=False,
+    symmetric=False,
+    row_height=0.30,
+    figsize_width=11,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    vals = np.array([r.get(metric_key, np.nan) for r in rows], dtype=float)
+
+    if standardize:
+        mu = np.nanmean(vals)
+        sd = np.nanstd(vals, ddof=1)
+        vals_plot = (vals - mu) / sd if sd > 0 else np.full_like(vals, np.nan)
+        global_plot = 0.0
+        xlabel = f"{xlabel} (z-score)"
+    else:
+        vals_plot = vals
+        global_plot = global_metric_value
+
+    rows2 = []
+    for r, x in zip(rows, vals_plot):
+        rr = dict(r)
+        rr["_metric_plot"] = x
+        rows2.append(rr)
+
+    rows_sorted = sorted(rows2, key=lambda r: np.nan_to_num(r["_metric_plot"], nan=np.inf))
+
+    n = len(rows_sorted)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(
+        nrows=n,
+        ncols=1,
+        figsize=(figsize_width, fig_height),
+        sharex=True
+    )
+    if n == 1:
+        axes = [axes]
+
+    finite_vals = np.array([r["_metric_plot"] for r in rows_sorted], dtype=float)
+    finite_vals = finite_vals[np.isfinite(finite_vals)]
+
+    if len(finite_vals) > 0:
+        xmin, xmax = np.min(finite_vals), np.max(finite_vals)
+    else:
+        xmin, xmax = 0, 1
+
+    if symmetric:
+        m = max(abs(xmin), abs(xmax), abs(global_plot) if global_plot is not None else 0)
+        m = m if m > 0 else 1
+        xlim = (-m * 1.05, m * 1.05)
+    else:
+        pad = 0.05 * (xmax - xmin) if xmax > xmin else 1.0
+        xlim = (xmin - pad, xmax + pad)
+
+    for ax, row in zip(axes, rows_sorted):
+        x = row["_metric_plot"]
+
+        if np.isfinite(x):
+            ax.hlines(y=1, xmin=min(0, x), xmax=max(0, x), linewidth=1.4)
+            ax.plot(x, 1, "o", markersize=4)
+
+        rank_val = row.get(f"{metric_key}_rank", np.nan)
+        pct_val = row.get(f"{metric_key}_pct", np.nan)
+
+        label = (
+            f"{row['gene']}  "
+            f"(zeros={row['zero_count']}, "
+            f"rank={safe_rank_str(rank_val, n_all_genes)}, "
+            f"pct={safe_pct_str(pct_val)})"
+        )
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([label], fontsize=7)
+
+        if global_plot is not None and np.isfinite(global_plot):
+            ax.axvline(global_plot, color="red", linewidth=1.2, alpha=0.9)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+        ax.set_xlim(*xlim)
+
+    if global_plot is not None and np.isfinite(global_plot):
+        axes[0].text(
+            global_plot,
+            1.35,
+            global_metric_label if global_metric_label else f"global={global_plot:.2f}",
+            color="red",
+            fontsize=8,
+            ha="left",
+            va="bottom",
+        )
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    fig.tight_layout()
+
+    return finalize_figure(
+        fig=fig,
+        title=title,
+        output_dir=output_dir,
+        save=save,
+        show=show,
+        close=close,
+        dpi=dpi,
+        ext=ext,
+    )
+
+
+# =========================================================
+# plotting: ECDF overlays
+# =========================================================
+def plot_ecdf_overlay(
+    rows,
+    value_key,
+    xlabel,
+    title,
+    transform=None,
+    alpha=None,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    n = len(rows)
+    if alpha is None:
+        alpha = min(0.5, max(0.03, 3.0 / max(n, 1)))
+
+    pooled = []
+
+    for row in rows:
+        vals = row[value_key]
+
+        if transform == "zscore":
+            vals = np.asarray(vals, dtype=float)
+            vals = vals[np.isfinite(vals)]
+            if len(vals) >= 2:
+                mu = np.mean(vals)
+                sd = np.std(vals, ddof=1)
+                vals = (vals - mu) / sd if sd > 0 else np.array([])
+            else:
+                vals = np.array([])
+
+        x, y = ecdf_values(vals)
+        if len(x) == 0:
+            continue
+
+        pooled.append(vals)
+        ax.step(x, y, where="post", alpha=alpha, linewidth=1.5, color="steelblue")
+
+    if len(pooled) > 0:
+        pooled_vals = np.concatenate([v for v in pooled if len(v) > 0])
+        if len(pooled_vals) > 0:
+            xg, yg = ecdf_values(pooled_vals)
+            ax.step(
+                xg,
+                yg,
+                where="post",
+                color="black",
+                linewidth=2.5,
+                alpha=1.0,
+                label="pooled selected genes",
+            )
+            ax.legend()
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("ECDF")
+    ax.set_title(title)
+    ax.grid(alpha=0.2)
+    fig.tight_layout()
+
+    return finalize_figure(
+        fig=fig,
+        title=title,
+        output_dir=output_dir,
+        save=save,
+        show=show,
+        close=close,
+        dpi=dpi,
+        ext=ext,
+    )
+
+
+# =========================================================
+# available figure names
+# =========================================================
+AVAILABLE_FIGURES = {
+    "expr_all",
+    "expr_pos",
+    "expr_log_all",
+    "expr_log_pos",
+    "sd_all",
+    "sd_pos",
+    "sdz_all",
+    "sdz_pos",
+    "cv_all",
+    "cv_pos",
+    "ecdf_all",
+    "ecdf_pos",
+    "ecdf_z_pos",
+}
+
+
+# =========================================================
+# main driver
+# =========================================================
+def plot_selected_genes_suite(
+    X,
+    genes=None,
+    figures=None,
+    output_dir="gene_plots",
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    genes = resolve_genes(X, genes)
+    all_metrics = compute_all_gene_metrics(X)
+    rows = collect_subset_rows(X, genes, all_metrics)
+    n_all_genes = len(all_metrics)
+
+    if figures is None:
+        figures = AVAILABLE_FIGURES.copy()
+    else:
+        figures = set(figures)
+
+    unknown = figures - AVAILABLE_FIGURES
+    if unknown:
+        raise ValueError(f"Unknown figure names: {sorted(unknown)}")
+
+    saved_paths = {}
+
+    global_median_all = np.nanmedian(all_metrics["median_all"])
+    global_median_pos = np.nanmedian(all_metrics["median_pos"])
+    global_sd_all = np.nanmedian(all_metrics["sd_all"])
+    global_sd_pos = np.nanmedian(all_metrics["sd_pos"])
+    global_cv_all = np.nanmedian(all_metrics["cv_all"])
+    global_cv_pos = np.nanmedian(all_metrics["cv_pos"])
+
+    xmax_all = np.nanmax([np.nanmax(r["vals_all"]) if len(r["vals_all"]) > 0 else np.nan for r in rows])
+    xmax_pos = np.nanmax([np.nanmax(r["vals_pos"]) if len(r["vals_pos"]) > 0 else np.nan for r in rows])
+    xmax_all_log = np.nanmax([np.nanmax(r["vals_all_log1p"]) if len(r["vals_all_log1p"]) > 0 else np.nan for r in rows])
+    xmax_pos_log = np.nanmax([np.nanmax(r["vals_pos_log1p"]) if len(r["vals_pos_log1p"]) > 0 else np.nan for r in rows])
+
+    if "expr_all" in figures:
+        saved_paths["expr_all"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_all",
+            metric_key="median_all",
+            xlabel="RSEM UQ expression",
+            title="Per-gene expression distributions across samples (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_median_all,
+            global_metric_label=f"all-gene median(median_all) = {global_median_all:.2f}",
+            xlim=(0, xmax_all),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "expr_pos" in figures:
+        saved_paths["expr_pos"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_pos",
+            metric_key="median_pos",
+            xlabel="RSEM UQ expression (>0 only)",
+            title="Per-gene expression distributions across samples (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_median_pos,
+            global_metric_label=f"all-gene median(median_pos) = {global_median_pos:.2f}",
+            xlim=(0, xmax_pos),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "expr_log_all" in figures:
+        saved_paths["expr_log_all"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_all_log1p",
+            metric_key="median_all",
+            xlabel="log(1 + RSEM UQ expression)",
+            title="Per-gene expression distributions across samples (log1p, zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=np.log1p(global_median_all),
+            global_metric_label=f"log1p(all-gene median(median_all)) = {np.log1p(global_median_all):.2f}",
+            xlim=(0, xmax_all_log),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "expr_log_pos" in figures:
+        saved_paths["expr_log_pos"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_pos_log1p",
+            metric_key="median_pos",
+            xlabel="log(1 + RSEM UQ expression, >0 only)",
+            title="Per-gene expression distributions across samples (log1p, zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=np.log1p(global_median_pos),
+            global_metric_label=f"log1p(all-gene median(median_pos)) = {np.log1p(global_median_pos):.2f}",
+            xlim=(0, xmax_pos_log),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sd_all" in figures:
+        saved_paths["sd_all"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_all",
+            xlabel="Standard deviation across samples",
+            title="Per-gene standard deviation (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_all,
+            global_metric_label=f"all-gene median(sd_all) = {global_sd_all:.2f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sd_pos" in figures:
+        saved_paths["sd_pos"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_pos",
+            xlabel="Standard deviation across samples (>0 only)",
+            title="Per-gene standard deviation (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_pos,
+            global_metric_label=f"all-gene median(sd_pos) = {global_sd_pos:.2f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sdz_all" in figures:
+        saved_paths["sdz_all"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_all",
+            xlabel="Standard deviation across samples",
+            title="Per-gene standard deviation z-score (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_all,
+            global_metric_label="global z = 0",
+            standardize=True,
+            symmetric=True,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sdz_pos" in figures:
+        saved_paths["sdz_pos"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_pos",
+            xlabel="Standard deviation across samples (>0 only)",
+            title="Per-gene standard deviation z-score (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_pos,
+            global_metric_label="global z = 0",
+            standardize=True,
+            symmetric=True,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "cv_all" in figures:
+        saved_paths["cv_all"] = plot_metric_single(
+            rows=rows,
+            metric_key="cv_all",
+            xlabel="Coefficient of variation",
+            title="Per-gene coefficient of variation (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_cv_all,
+            global_metric_label=f"all-gene median(cv_all) = {global_cv_all:.3f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "cv_pos" in figures:
+        saved_paths["cv_pos"] = plot_metric_single(
+            rows=rows,
+            metric_key="cv_pos",
+            xlabel="Coefficient of variation (>0 only)",
+            title="Per-gene coefficient of variation (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_cv_pos,
+            global_metric_label=f"all-gene median(cv_pos) = {global_cv_pos:.3f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "ecdf_all" in figures:
+        saved_paths["ecdf_all"] = plot_ecdf_overlay(
+            rows=rows,
+            value_key="vals_all",
+            xlabel="RSEM UQ expression",
+            title="ECDF overlay (zeros retained)",
+            transform=None,
+            alpha=0.08,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "ecdf_pos" in figures:
+        saved_paths["ecdf_pos"] = plot_ecdf_overlay(
+            rows=rows,
+            value_key="vals_pos",
+            xlabel="RSEM UQ expression (>0 only)",
+            title="ECDF overlay (zeros removed)",
+            transform=None,
+            alpha=0.08,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "ecdf_z_pos" in figures:
+        saved_paths["ecdf_z_pos"] = plot_ecdf_overlay(
+            rows=rows,
+            value_key="vals_pos",
+            xlabel="Per-gene standardized expression (>0 only)",
+            title="ECDF overlay (zeros removed, within-gene z-score)",
+            transform="zscore",
+            alpha=0.10,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    return rows, all_metrics, saved_paths
+
+
+
+
+
+
+def plot_single_gene_boxplot(
+    df_mrna_seq,
+    gene,
+    set_index_fn=None,
+    transform=None,
+    remove_zeros=True,
+    title="Gene Expression",
+    subtitle="The distribution of mRNA-seq data across tumour samples",
+    xlabel=None,
+    figsize=(10, 2.8),
+    title_fs=18,
+    subtitle_fs=12,
+    axis_label_fs=14,
+    tick_fs=12,
+    tick_grey="#B0B0B0",
+    grid_grey="#D0D0D0",
+    box_facecolor="#4C78A8",
+    box_edgecolor="#2F2F2F",
+    median_color="#111111",
+    whisker_color="#4A4A4A",
+    box_width=0.55,
+    box_linewidth=1.2,
+    median_linewidth=1.8,
+    whisker_linewidth=0.9,
+    outlier_size=4.2,
+    outlier_face_rgba=(0.35, 0.35, 0.35, 0.45),
+    outlier_edge_rgba=(0.35, 0.35, 0.35, 0.65),
+    outlier_edgewidth=0.5,
+    top=0.62,
+    left=0.14,
+    bottom=0.28,
+    show_summary=False,
+    return_data=False,
+):
+    """
+    Plot a single horizontal boxplot for one gene across samples.
+
+    Parameters
+    ----------
+    df_mrna_seq : pandas.DataFrame
+        Gene x sample expression matrix, or source dataframe to be indexed first.
+    gene : str or tuple
+        Gene selector. If the dataframe is MultiIndexed and `gene` is a string,
+        the function will try to select rows whose Hugo_Symbol level equals `gene`.
+    set_index_fn : callable or None
+        Optional function that converts df_mrna_seq into the indexed expression dataframe.
+        Example: set_expression_matrix_index
+    transform : {None, "log1p"}
+        Optional transform applied after zero filtering.
+    remove_zeros : bool
+        If True, only positive values are plotted.
+    xlabel : str or None
+        If None, chosen automatically based on transform.
+    show_summary : bool
+        If True, prints a small summary.
+    return_data : bool
+        If True, returns (fig, ax, values_used, summary_dict). Otherwise returns (fig, ax).
+    """
+
+    # ---------------------------------
+    # prepare dataframe
+    # ---------------------------------
+    df = df_mrna_seq.copy()
+    if set_index_fn is not None:
+        df = set_index_fn(df)
+
+    # ---------------------------------
+    # select the gene rows
+    # ---------------------------------
+    if isinstance(df.index, pd.MultiIndex):
+        if isinstance(gene, tuple):
+            df_gene = df.loc[[gene]]
+            gene_label = str(gene[1]) if len(gene) > 1 else str(gene)
+        else:
+            # assume gene refers to the Hugo_Symbol level
+            level_names = list(df.index.names)
+            if "Hugo_Symbol" in level_names:
+                hugo_level = level_names.index("Hugo_Symbol")
+                mask = df.index.get_level_values(hugo_level) == gene
+                df_gene = df.loc[mask]
+                gene_label = str(gene)
+            else:
+                raise ValueError(
+                    "MultiIndex detected but no 'Hugo_Symbol' level found. "
+                    "Pass a full tuple index value for `gene`."
+                )
+    else:
+        df_gene = df.loc[[gene]]
+        gene_label = str(gene)
+
+    if df_gene.shape[0] == 0:
+        raise ValueError(f"No rows matched gene={gene!r}")
+
+    # ---------------------------------
+    # flatten values
+    # ---------------------------------
+    raw = pd.to_numeric(df_gene.to_numpy().ravel(), errors="coerce")
+    raw = raw[np.isfinite(raw)]
+
+    if remove_zeros:
+        vals = raw[raw > 0]
+    else:
+        vals = raw.copy()
+
+    if len(vals) == 0:
+        raise ValueError("No values left after filtering.")
+
+    # ---------------------------------
+    # optional transform
+    # ---------------------------------
+    if transform is None:
+        vals_plot = vals
+        if xlabel is None:
+            xlabel = "Gene Expression (RSEM UQ Normalized)"
+    elif transform == "log1p":
+        vals_plot = np.log1p(vals)
+        if xlabel is None:
+            xlabel = "Gene Expression (log(1 + RSEM UQ Normalized))"
+    else:
+        raise ValueError("transform must be one of: None, 'log1p'")
+
+    # ---------------------------------
+    # summary
+    # ---------------------------------
+    summary = {
+        "gene": gene,
+        "gene_label": gene_label,
+        "n_total": len(raw),
+        "n_used": len(vals),
+        "zero_count": int(np.sum(raw == 0)),
+        "min": float(np.min(vals)),
+        "q10": float(np.percentile(vals, 10)),
+        "q25": float(np.percentile(vals, 25)),
+        "median": float(np.median(vals)),
+        "q75": float(np.percentile(vals, 75)),
+        "q90": float(np.percentile(vals, 90)),
+        "max": float(np.max(vals)),
+    }
+
+    if show_summary:
+        print("Gene:", summary["gene"])
+        print("Gene label:", summary["gene_label"])
+        print("n total:", summary["n_total"])
+        print("n used:", summary["n_used"])
+        print("zero count:", summary["zero_count"])
+        print("min:", summary["min"])
+        print("q10:", summary["q10"])
+        print("q25:", summary["q25"])
+        print("median:", summary["median"])
+        print("q75:", summary["q75"])
+        print("q90:", summary["q90"])
+        print("max:", summary["max"])
+
+    # ---------------------------------
+    # figure
+    # ---------------------------------
+    fig, ax = plt.subplots(figsize=figsize)
+    fig.subplots_adjust(top=top, left=left, bottom=bottom)
+
+    # title + subtitle
+    fig.text(
+        left, 0.97, title,
+        ha="left", va="top",
+        fontsize=title_fs, fontweight="bold"
+    )
+    fig.text(
+        left, 0.89, subtitle,
+        ha="left", va="top",
+        fontsize=subtitle_fs
+    )
+
+    # boxplot
+    ax.boxplot(
+        vals_plot,
+        vert=False,
+        widths=box_width,
+        showfliers=True,
+        patch_artist=True,
+        boxprops=dict(
+            facecolor=box_facecolor,
+            edgecolor=box_edgecolor,
+            linewidth=box_linewidth
+        ),
+        medianprops=dict(
+            color=median_color,
+            linewidth=median_linewidth
+        ),
+        whiskerprops=dict(
+            color=whisker_color,
+            linewidth=whisker_linewidth
+        ),
+        capprops=dict(
+            color=whisker_color,
+            linewidth=whisker_linewidth
+        ),
+        flierprops=dict(
+            marker="o",
+            markersize=outlier_size,
+            markerfacecolor=outlier_face_rgba,
+            markeredgecolor=outlier_edge_rgba,
+            markeredgewidth=outlier_edgewidth,
+            linestyle="none"
+        )
+    )
+
+    # axis labels / ticks
+    ax.set_xlabel(xlabel, fontsize=axis_label_fs, labelpad=14)
+    ax.set_yticks([1])
+    ax.set_yticklabels([gene_label], fontsize=tick_fs)
+
+    ax.tick_params(axis="x", labelsize=tick_fs, colors=tick_grey)
+    ax.tick_params(axis="y", labelsize=tick_fs, length=0)
+
+    # remove border
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    # light vertical grid
+    ax.grid(axis="x", color=grid_grey, alpha=0.5)
+
+    if return_data:
+        return fig, ax, vals_plot, summary
+    return fig, ax
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =========================================================
+# helpers
+# =========================================================
+def resolve_genes(X, genes=None):
+    if genes is None:
+        return list(X.index)
+    return list(genes)
+
+
+def safe_mean(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.mean(x) if len(x) > 0 else np.nan
+
+
+def safe_median(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.median(x) if len(x) > 0 else np.nan
+
+
+def safe_sd(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.std(x, ddof=1) if len(x) >= 2 else np.nan
+
+
+def safe_cv(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) < 2:
+        return np.nan
+    mu = np.mean(x)
+    sd = np.std(x, ddof=1)
+    return sd / mu if mu > 0 else np.nan
+
+
+def ecdf_values(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) == 0:
+        return np.array([]), np.array([])
+    x = np.sort(x)
+    y = np.arange(1, len(x) + 1) / len(x)
+    return x, y
+
+
+def safe_rank_str(rank_val, n_all):
+    if np.isfinite(rank_val):
+        return f"{int(round(rank_val))}/{n_all}"
+    return "NA"
+
+
+def safe_pct_str(pct_val):
+    if np.isfinite(pct_val):
+        return f"{pct_val:.1f}"
+    return "NA"
+
+
+# =========================================================
+# all-gene metrics
+# =========================================================
+def compute_all_gene_metrics(X):
+    rows = []
+
+    for gene in X.index:
+        raw = X.loc[gene].to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        pos = raw[raw > 0]
+
+        zero_count = int(np.sum(raw == 0))
+        zero_prop = zero_count / len(raw) if len(raw) > 0 else np.nan
+
+        rows.append({
+            "gene": gene,
+            "zero_count": zero_count,
+            "zero_prop": zero_prop,
+
+            "mean_all": safe_mean(raw),
+            "median_all": safe_median(raw),
+            "sd_all": safe_sd(raw),
+            "cv_all": safe_cv(raw),
+
+            "mean_pos": safe_mean(pos),
+            "median_pos": safe_median(pos),
+            "sd_pos": safe_sd(pos),
+            "cv_pos": safe_cv(pos),
+        })
+
+    all_metrics = pd.DataFrame(rows).set_index("gene")
+
+    for metric in ["median_all", "median_pos", "sd_all", "sd_pos", "cv_all", "cv_pos"]:
+        s = all_metrics[metric]
+        all_metrics[f"{metric}_rank"] = s.rank(method="average", ascending=True)
+        all_metrics[f"{metric}_pct"] = s.rank(method="average", pct=True, ascending=True) * 100
+
+    return all_metrics
+
+
+# =========================================================
+# subset rows
+# =========================================================
+def collect_subset_rows(X, genes, all_metrics):
+    rows = []
+    for gene in genes:
+        raw = X.loc[gene].to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        pos = raw[raw > 0]
+
+        rr = {
+            "gene": gene,
+            "vals_all": raw,
+            "vals_pos": pos,
+            "vals_all_log1p": np.log1p(raw),
+            "vals_pos_log1p": np.log1p(pos),
+        }
+        rr.update(all_metrics.loc[[gene]].iloc[0].to_dict())
+        rows.append(rr)
+    return rows
+
+
+# =========================================================
+# stacked boxplots, one figure, one dataset version
+# =========================================================
+def plot_boxplots_single_version_other(
+    rows,
+    value_key,
+    metric_key,
+    xlabel,
+    title,
+    n_all_genes,
+    global_metric_value=None,
+    global_metric_label=None,
+    xlim=None,
+    row_height=0.30,
+    figsize_width=11,
+):
+    rows_sorted = sorted(
+        rows,
+        key=lambda r: np.nan_to_num(r.get(metric_key, np.nan), nan=np.inf)
+    )
+
+    n = len(rows_sorted)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(figsize_width, fig_height), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    for ax, row in zip(axes, rows_sorted):
+        vals = row[value_key]
+        if len(vals) > 0:
+            ax.boxplot(vals, vert=False, widths=0.6, showfliers=True)
+
+        rank_val = row.get(f"{metric_key}_rank", np.nan)
+        pct_val = row.get(f"{metric_key}_pct", np.nan)
+
+        label = (
+            f"{row['gene']}  "
+            f"(zeros={row['zero_count']}, "
+            f"rank={safe_rank_str(rank_val, n_all_genes)}, "
+            f"pct={safe_pct_str(pct_val)})"
+        )
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([label], fontsize=7)
+
+        if global_metric_value is not None and np.isfinite(global_metric_value):
+            ax.axvline(global_metric_value, color="red", linewidth=1.2, alpha=0.9)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+
+        if xlim is not None:
+            ax.set_xlim(*xlim)
+
+    if global_metric_value is not None and np.isfinite(global_metric_value):
+        axes[0].text(
+            global_metric_value, 1.35,
+            global_metric_label if global_metric_label else f"global={global_metric_value:.2f}",
+            color="red", fontsize=8, ha="left", va="bottom"
+        )
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    plt.tight_layout()
+    plt.show()
+
+
+# =========================================================
+# metric plots, one figure, one metric
+# =========================================================
+def plot_metric_single(
+    rows,
+    metric_key,
+    xlabel,
+    title,
+    n_all_genes,
+    global_metric_value=None,
+    global_metric_label=None,
+    standardize=False,
+    symmetric=False,
+    row_height=0.30,
+    figsize_width=11,
+):
+    vals = np.array([r.get(metric_key, np.nan) for r in rows], dtype=float)
+
+    if standardize:
+        mu = np.nanmean(vals)
+        sd = np.nanstd(vals, ddof=1)
+        vals_plot = (vals - mu) / sd if sd > 0 else np.full_like(vals, np.nan)
+        global_plot = 0.0
+        xlabel = f"{xlabel} (z-score)"
+    else:
+        vals_plot = vals
+        global_plot = global_metric_value
+
+    rows2 = []
+    for r, x in zip(rows, vals_plot):
+        rr = dict(r)
+        rr["_metric_plot"] = x
+        rows2.append(rr)
+
+    rows_sorted = sorted(rows2, key=lambda r: np.nan_to_num(r["_metric_plot"], nan=np.inf))
+
+    n = len(rows_sorted)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(figsize_width, fig_height), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    finite_vals = np.array([r["_metric_plot"] for r in rows_sorted], dtype=float)
+    finite_vals = finite_vals[np.isfinite(finite_vals)]
+
+    if len(finite_vals) > 0:
+        xmin, xmax = np.min(finite_vals), np.max(finite_vals)
+    else:
+        xmin, xmax = 0, 1
+
+    if symmetric:
+        m = max(abs(xmin), abs(xmax), abs(global_plot) if global_plot is not None else 0)
+        xlim = (-m * 1.05, m * 1.05)
+    else:
+        pad = 0.05 * (xmax - xmin) if xmax > xmin else 1.0
+        xlim = (xmin - pad, xmax + pad)
+
+    for ax, row in zip(axes, rows_sorted):
+        x = row["_metric_plot"]
+
+        if np.isfinite(x):
+            ax.hlines(y=1, xmin=min(0, x), xmax=max(0, x), linewidth=1.4)
+            ax.plot(x, 1, "o", markersize=4)
+
+        pct_val = row.get(f"{metric_key}_pct", np.nan)
+        rank_val = row.get(f"{metric_key}_rank", np.nan)
+
+        label = (
+            f"{row['gene']}  "
+            f"(zeros={row['zero_count']}, "
+            f"rank={safe_rank_str(rank_val, n_all_genes)}, "
+            f"pct={safe_pct_str(pct_val)})"
+        )
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([label], fontsize=7)
+
+        if global_plot is not None and np.isfinite(global_plot):
+            ax.axvline(global_plot, color="red", linewidth=1.2, alpha=0.9)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+        ax.set_xlim(*xlim)
+
+    if global_plot is not None and np.isfinite(global_plot):
+        axes[0].text(
+            global_plot, 1.35,
+            global_metric_label if global_metric_label else f"global={global_plot:.2f}",
+            color="red", fontsize=8, ha="left", va="bottom"
+        )
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    plt.tight_layout()
+    plt.show()
+
+
+# =========================================================
+# ECDF overlays
+# =========================================================
+def plot_ecdf_overlay(
+    rows,
+    value_key,
+    xlabel,
+    title,
+    transform=None,
+    alpha=None,
+    global_curve="median",
+):
+    plt.figure(figsize=(9, 6))
+
+    n = len(rows)
+    if alpha is None:
+        alpha = min(0.5, max(0.03, 3.0 / max(n, 1)))
+
+    transformed_curves = []
+
+    for row in rows:
+        vals = row[value_key]
+        if transform == "zscore":
+            vals = np.asarray(vals, dtype=float)
+            vals = vals[np.isfinite(vals)]
+            if len(vals) >= 2:
+                mu = np.mean(vals)
+                sd = np.std(vals, ddof=1)
+                vals = (vals - mu) / sd if sd > 0 else np.array([])
+            else:
+                vals = np.array([])
+
+        x, y = ecdf_values(vals)
+        if len(x) == 0:
+            continue
+
+        transformed_curves.append((x, y))
+        plt.step(x, y, where="post", alpha=alpha, linewidth=1.5, color="steelblue")
+
+    # special global reference
+    if global_curve == "median" and len(transformed_curves) > 0:
+        # pooled values from all selected genes
+        pooled = []
+        for row in rows:
+            vals = row[value_key]
+            if transform == "zscore":
+                vals = np.asarray(vals, dtype=float)
+                vals = vals[np.isfinite(vals)]
+                if len(vals) >= 2:
+                    mu = np.mean(vals)
+                    sd = np.std(vals, ddof=1)
+                    vals = (vals - mu) / sd if sd > 0 else np.array([])
+                else:
+                    vals = np.array([])
+            pooled.append(vals)
+
+        pooled = np.concatenate([v for v in pooled if len(v) > 0]) if len(pooled) > 0 else np.array([])
+        if len(pooled) > 0:
+            xg, yg = ecdf_values(pooled)
+            plt.step(xg, yg, where="post", color="black", linewidth=2.5, alpha=1.0, label="pooled selected genes")
+
+    plt.xlabel(xlabel)
+    plt.ylabel("ECDF")
+    plt.title(title)
+    plt.grid(alpha=0.2)
+    if global_curve == "median":
+        plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+# =========================================================
+# driver
+# =========================================================
+def plot_selected_genes_suite_v3(X, genes=None):
+    genes = resolve_genes(X, genes)
+    all_metrics = compute_all_gene_metrics(X)
+    rows = collect_subset_rows(X, genes, all_metrics)
+    n_all_genes = len(all_metrics)
+
+    # global references from ALL genes
+    global_median_all = np.nanmedian(all_metrics["median_all"])
+    global_median_pos = np.nanmedian(all_metrics["median_pos"])
+    global_sd_all = np.nanmedian(all_metrics["sd_all"])
+    global_sd_pos = np.nanmedian(all_metrics["sd_pos"])
+    global_cv_all = np.nanmedian(all_metrics["cv_all"])
+    global_cv_pos = np.nanmedian(all_metrics["cv_pos"])
+
+    # expression plots
+    xmax_all = np.nanmax([np.nanmax(r["vals_all"]) if len(r["vals_all"]) > 0 else np.nan for r in rows])
+    xmax_pos = np.nanmax([np.nanmax(r["vals_pos"]) if len(r["vals_pos"]) > 0 else np.nan for r in rows])
+
+    plot_boxplots_single_version(
+        rows=rows,
+        value_key="vals_all",
+        metric_key="median_all",
+        xlabel="RSEM UQ expression",
+        title="Per-gene expression distributions across samples (zeros retained)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_median_all,
+        global_metric_label=f"all-gene median(median_all) = {global_median_all:.2f}",
+        xlim=(0, xmax_all)
+    )
+
+    plot_boxplots_single_version(
+        rows=rows,
+        value_key="vals_pos",
+        metric_key="median_pos",
+        xlabel="RSEM UQ expression (>0 only)",
+        title="Per-gene expression distributions across samples (zeros removed)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_median_pos,
+        global_metric_label=f"all-gene median(median_pos) = {global_median_pos:.2f}",
+        xlim=(0, xmax_pos)
+    )
+
+    # transformed expression plots
+    xmax_all_log = np.nanmax([np.nanmax(r["vals_all_log1p"]) if len(r["vals_all_log1p"]) > 0 else np.nan for r in rows])
+    xmax_pos_log = np.nanmax([np.nanmax(r["vals_pos_log1p"]) if len(r["vals_pos_log1p"]) > 0 else np.nan for r in rows])
+
+    plot_boxplots_single_version(
+        rows=rows,
+        value_key="vals_all_log1p",
+        metric_key="median_all",
+        xlabel="log(1 + RSEM UQ expression)",
+        title="Per-gene expression distributions across samples (log1p, zeros retained)",
+        n_all_genes=n_all_genes,
+        global_metric_value=np.log1p(global_median_all),
+        global_metric_label=f"log1p(all-gene median(median_all)) = {np.log1p(global_median_all):.2f}",
+        xlim=(0, xmax_all_log)
+    )
+
+    plot_boxplots_single_version(
+        rows=rows,
+        value_key="vals_pos_log1p",
+        metric_key="median_pos",
+        xlabel="log(1 + RSEM UQ expression, >0 only)",
+        title="Per-gene expression distributions across samples (log1p, zeros removed)",
+        n_all_genes=n_all_genes,
+        global_metric_value=np.log1p(global_median_pos),
+        global_metric_label=f"log1p(all-gene median(median_pos)) = {np.log1p(global_median_pos):.2f}",
+        xlim=(0, xmax_pos_log)
+    )
+
+    # SD
+    plot_metric_single(
+        rows=rows,
+        metric_key="sd_all",
+        xlabel="Standard deviation across samples",
+        title="Per-gene standard deviation (zeros retained)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_sd_all,
+        global_metric_label=f"all-gene median(sd_all) = {global_sd_all:.2f}",
+        standardize=False,
+        symmetric=False
+    )
+
+    plot_metric_single(
+        rows=rows,
+        metric_key="sd_pos",
+        xlabel="Standard deviation across samples (>0 only)",
+        title="Per-gene standard deviation (zeros removed)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_sd_pos,
+        global_metric_label=f"all-gene median(sd_pos) = {global_sd_pos:.2f}",
+        standardize=False,
+        symmetric=False
+    )
+
+    # SD z-score
+    plot_metric_single(
+        rows=rows,
+        metric_key="sd_all",
+        xlabel="Standard deviation across samples",
+        title="Per-gene standard deviation z-score (zeros retained)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_sd_all,
+        global_metric_label="global z = 0",
+        standardize=True,
+        symmetric=True
+    )
+
+    plot_metric_single(
+        rows=rows,
+        metric_key="sd_pos",
+        xlabel="Standard deviation across samples (>0 only)",
+        title="Per-gene standard deviation z-score (zeros removed)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_sd_pos,
+        global_metric_label="global z = 0",
+        standardize=True,
+        symmetric=True
+    )
+
+    # CV
+    plot_metric_single(
+        rows=rows,
+        metric_key="cv_all",
+        xlabel="Coefficient of variation",
+        title="Per-gene coefficient of variation (zeros retained)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_cv_all,
+        global_metric_label=f"all-gene median(cv_all) = {global_cv_all:.3f}",
+        standardize=False,
+        symmetric=False
+    )
+
+    plot_metric_single(
+        rows=rows,
+        metric_key="cv_pos",
+        xlabel="Coefficient of variation (>0 only)",
+        title="Per-gene coefficient of variation (zeros removed)",
+        n_all_genes=n_all_genes,
+        global_metric_value=global_cv_pos,
+        global_metric_label=f"all-gene median(cv_pos) = {global_cv_pos:.3f}",
+        standardize=False,
+        symmetric=False
+    )
+
+    # ECDFs
+    plot_ecdf_overlay(
+        rows=rows,
+        value_key="vals_all",
+        xlabel="RSEM UQ expression",
+        title="ECDF overlay (zeros retained)",
+        transform=None,
+        alpha=0.08
+    )
+
+    plot_ecdf_overlay(
+        rows=rows,
+        value_key="vals_pos",
+        xlabel="RSEM UQ expression (>0 only)",
+        title="ECDF overlay (zeros removed)",
+        transform=None,
+        alpha=0.08
+    )
+
+    plot_ecdf_overlay(
+        rows=rows,
+        value_key="vals_pos",
+        xlabel="Per-gene standardized expression (>0 only)",
+        title="ECDF overlay (zeros removed, within-gene z-score)",
+        transform="zscore",
+        alpha=0.10
+    )
+
+    return rows, all_metrics
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =========================================================
+# 1) Helpers
+# =========================================================
+def set_expression_matrix_index(df):
+    """
+    Returns a copy of df with a MultiIndex:
+      level 0: original row number (row_id)
+      level 1: Hugo_Symbol
+      level 2: Entrez_Gene_Id
+    """
+    out = df.copy()
+
+    out["Hugo_Symbol"] = out["Hugo_Symbol"].fillna("No-Hugo")
+    out["Entrez_Gene_Id"] = pd.to_numeric(out["Entrez_Gene_Id"], errors="coerce").astype("Int64")
+
+    out = out.reset_index(names="row_id")
+    out = out.set_index(["row_id", "Hugo_Symbol", "Entrez_Gene_Id"])
+
+    return out
+
 ```
 
 ### Environment
@@ -447,8 +2118,9 @@ Checks
 
 ```{python}
 #| label: analyze-setup-environment
-#| eval: true
+#| eval: false
 #| display: false
+#| output: false
 
 # ---------- helpers ----------
 
@@ -1157,6 +2829,7 @@ plt.ylabel("Number of samples")
 plt.tight_layout()
 plt.show()
 ```
+
 #### Interpretation
 If the data are properly UQ-normalized:
 - The histogram should be tightly concentrated
@@ -1220,75 +2893,6 @@ The coefficient of variation summarized how tightly aligned the UQ values are
 - Small: strong normalization consistency
 - Large: residual scaling differences
 
-## Demonstrating what UQ normalization fixes
-
-Since we don't have raw counts, we simulate uneven sequencing depth by artificially scaling samples. 
-
-### Create Artificial Library Size Differences
-
-```{python}
-rng = np.random.default_rng(42)
-
-fake_scale = pd.Series(
-    rng.uniform(0.5, 2.0, size=X.shape[1]),
-    index=X.columns,
-    name="fake_scale"
-)
-
-X_fake_raw = X.mul(fake_scale, axis=1)
-uq_fake = X_fake_raw.apply(uq_nonzero, axis=0)
-uq_fake
-```
-
-#### Distortion
-
-```{python}
-plt.figure(figsize=(6,4))
-plt.hist(uq_fake.dropna().values, bins=40)
-plt.title("Artificially Distorted Data (UQ Spread Out)")
-plt.xlabel("UQ value")
-plt.ylabel("Number of samples")
-plt.tight_layout()
-plt.show()
-```
-
-Multiplicative scaling causes the 75th percentile values to diverge.
-
-#### Reapply UQ Normalization
-
-```{python}
-target = np.nanmedian(uq_fake.values)
-
-X_fake_uq = X_fake_raw.div(uq_fake, axis=1) * target
-uq_after = X_fake_uq.apply(uq_nonzero, axis=0)
-uq_after
-```
-
-#### Correction
-
-```{python}
-plt.figure(figsize=(6,4))
-plt.hist(uq_after.dropna().values, bins=40)
-plt.title("After UQ Normalization (UQ Realigned)")
-plt.xlabel("UQ value")
-plt.ylabel("Number of samples")
-plt.tight_layout()
-plt.show()
-```
-
-### Compare Before vs After
-
-```{python}
-plt.figure(figsize=(6,4))
-plt.hist(uq_fake.dropna().values, bins=40, alpha=0.5, label="Distorted")
-plt.hist(uq_after.dropna().values, bins=40, alpha=0.5, label="After UQ")
-plt.legend()
-plt.title("Effect of UQ Normalization")
-plt.xlabel("UQ value")
-plt.ylabel("Number of samples")
-plt.tight_layout()
-plt.show()
-```
 
 
 Overall UQ normalization: 
@@ -2671,15 +4275,195 @@ Start presentation again
 Let's take a look at it
 
 ```{python}
-df = df_mrna_seq
-df
+
+# Single Plot - RSEM
+fig, ax = plot_single_gene_boxplot(
+    df_mrna_seq=df_mrna_seq,
+    gene="ERBB2",
+    set_index_fn=set_expression_matrix_index,
+    transform=None,
+    remove_zeros=True
+)
+plt.show()
+
+# Single Plot - Log
+fig, ax = plot_single_gene_boxplot(
+    df_mrna_seq=df_mrna_seq,
+    gene="ERBB2",
+    set_index_fn=set_expression_matrix_index,
+    transform="log1p",
+    remove_zeros=True,
+    title="Gene Expression",
+    subtitle="The distribution of mRNA-seq data across tumour samples"
+)
+plt.show()
+
 ```
+
+
+
+
+```{python}
+
+# Use the newest fanciest creator of plots! Commented out, because we don't really want it running all the time. 
+
+# Properly index the dataframe, so it is unique.
+X = set_expression_matrix_index(df_mrna_seq)
+
+# Make a few figures for 20 genes
+rows, all_metrics, saved = plot_selected_genes_suite(
+    X,
+    genes=X.index[:20],
+    figures={"expr_pos", "cv_pos", "ecdf_z_pos"},
+    output_dir="plots_20_genes",
+    save=True,
+    show=True,
+    close=True,
+    dpi=150,
+)
+
+# # Full dataset, one figure
+# rows, all_metrics, saved = plot_selected_genes_suite(
+#     X,
+#     genes=X.index,
+#     figures={"ecdf_z_pos"},
+#     output_dir="plots_all_genes",
+#     save=True,
+#     show=False,
+#     close=True,
+#     dpi=150,
+# )
+
+
+```
+
+
+#### Subtype
+
+```{python}
+# Creating all the objects I need, because I keep making them over and over again. 
+
+
+
+
+# =========================================================
+# 2) Build gene-centric expression dataframe
+# =========================================================
+df_mrna_seq_indexed = set_expression_matrix_index(df_mrna_seq.copy())
+
+sample_cols = [c for c in df_mrna_seq.columns if c not in ["Hugo_Symbol", "Entrez_Gene_Id"]]
+
+df_gene_expr_by_sample = (
+    df_mrna_seq_indexed[sample_cols]
+    .apply(pd.to_numeric, errors="coerce")
+    .copy()
+)
+
+df_gene_expr_by_sample_log1p = np.log1p(df_gene_expr_by_sample)
+
+
+# =========================================================
+# 3) Gene metadata
+# =========================================================
+df_gene_meta = (
+    df_mrna_seq_indexed
+    .reset_index()[["row_id", "Hugo_Symbol", "Entrez_Gene_Id"]]
+    .set_index(["row_id", "Hugo_Symbol", "Entrez_Gene_Id"])
+    .copy()
+)
+
+
+# =========================================================
+# 4) Sample metadata
+# =========================================================
+df_sample_meta = (
+    df_clinical_samples[["SAMPLE_ID", "PATIENT_ID"]]
+    .merge(
+        df_clinical_patients[["PATIENT_ID", "SUBTYPE"]],
+        on="PATIENT_ID",
+        how="left"
+    )
+    .copy()
+)
+
+df_sample_meta["SUBTYPE"] = df_sample_meta["SUBTYPE"].fillna("NA")
+df_sample_meta = df_sample_meta.set_index("SAMPLE_ID", drop=True)
+
+
+# =========================================================
+# 5) Align gene-expression columns to known samples
+# =========================================================
+sample_cols_in_both = [c for c in df_gene_expr_by_sample.columns if c in df_sample_meta.index]
+
+df_gene_expr_by_sample = df_gene_expr_by_sample[sample_cols_in_both]
+df_gene_expr_by_sample_log1p = df_gene_expr_by_sample_log1p[sample_cols_in_both]
+
+
+# =========================================================
+# 6) Sample-centric expression dataframes
+# =========================================================
+df_sample_expr_by_gene = df_gene_expr_by_sample.T.copy()
+df_sample_expr_by_gene_log1p = df_gene_expr_by_sample_log1p.T.copy()
+
+df_sample_expr_by_gene.index.name = "SAMPLE_ID"
+df_sample_expr_by_gene_log1p.index.name = "SAMPLE_ID"
+
+
+# =========================================================
+# 7) Sample metadata + gene expression combined
+# =========================================================
+common_samples = df_sample_meta.index.intersection(df_sample_expr_by_gene.index)
+
+df_sample_meta_aligned = df_sample_meta.loc[common_samples].copy()
+df_sample_expr_by_gene_aligned = df_sample_expr_by_gene.loc[common_samples].copy()
+
+# Promote metadata columns to 3-level MultiIndex
+df_sample_meta_aligned.columns = pd.MultiIndex.from_tuples(
+    [("sample_meta", col, "") for col in df_sample_meta_aligned.columns],
+    names=["row_id", "Hugo_Symbol", "Entrez_Gene_Id"]
+)
+
+# Ensure gene columns are also a named MultiIndex
+df_sample_expr_by_gene_aligned.columns = pd.MultiIndex.from_tuples(
+    [(str(a), str(b), str(c)) for a, b, c in df_sample_expr_by_gene_aligned.columns],
+    names=["row_id", "Hugo_Symbol", "Entrez_Gene_Id"]
+)
+
+df_sample_expr__gene_expr = pd.concat(
+    [df_sample_meta_aligned, df_sample_expr_by_gene_aligned],
+    axis=1
+)
+
+
+# =========================================================
+# 8) Optional checks
+# =========================================================
+print("df_gene_meta:", df_gene_meta.shape)
+print("df_sample_meta:", df_sample_meta.shape)
+
+print("df_gene_expr_by_sample:", df_gene_expr_by_sample.shape)
+print("df_gene_expr_by_sample_log1p:", df_gene_expr_by_sample_log1p.shape)
+
+print("df_sample_expr_by_gene:", df_sample_expr_by_gene.shape)
+print("df_sample_expr_by_gene_log1p:", df_sample_expr_by_gene_log1p.shape)
+
+print("df_sample_expr__gene_expr:", df_sample_expr__gene_expr.shape)
+
+print("\nSubtype frequencies:")
+print(df_sample_meta["SUBTYPE"].value_counts(dropna=False))
+
+```
+
+
+#### Continuing with other stuff 
+
 ```{python}
 meta_cols = ["Entrez_Gene_Id", "Hugo_Symbol"]
 
 # We remove the non-sample columns, for now
-X = df.drop(columns=meta_cols)
+X = df_mrna_seq.copy().drop(columns=meta_cols)
 X
+X.describe()
 ```
 ```{python}
 # Sneaky Sneaky ... we're using T for transpose and bringing it back
@@ -2691,6 +4475,9 @@ gene_distribution
 gene_distribution = gene_distribution.sort_values("std", ascending=False)
 gene_distribution
 ```
+
+
+
 
 ```{python}
 plt.hist(gene_distribution["std"])
@@ -2848,6 +4635,281 @@ uq = X.apply(lambda s: np.quantile(nonzero_vals(s), 0.75) if nonzero_vals(s).siz
 ```
 
 
+## Density overlays with quantiles
+```{python}
+#| eval: false
+#| output: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+
+# df: genes x samples, UQ-normalized values
+# one column = one sample
+
+# -----------------------------
+# piecewise transform functions
+# -----------------------------
+def forward_transform(x, x_break=1000.0, xmax=None, left_frac=0.75):
+    """
+    Map data x to display coordinate t in [0, 1].
+
+    [0, x_break]      -> [0, left_frac]
+    [x_break, xmax]   -> [left_frac, 1]
+    """
+    x = np.asarray(x, dtype=float)
+    if xmax is None:
+        raise ValueError("xmax must be provided")
+
+    t = np.empty_like(x)
+
+    left = x <= x_break
+    right = ~left
+
+    # first segment
+    t[left] = left_frac * (x[left] / x_break)
+
+    # second segment
+    if xmax <= x_break:
+        t[right] = left_frac
+    else:
+        t[right] = left_frac + (1 - left_frac) * (x[right] - x_break) / (xmax - x_break)
+
+    return t
+
+
+def inverse_transform(t, x_break=1000.0, xmax=None, left_frac=0.75):
+    """
+    Inverse map from display coordinate t in [0, 1] back to data x.
+    """
+    t = np.asarray(t, dtype=float)
+    if xmax is None:
+        raise ValueError("xmax must be provided")
+
+    x = np.empty_like(t)
+
+    left = t <= left_frac
+    right = ~left
+
+    x[left] = x_break * (t[left] / left_frac)
+
+    if xmax <= x_break:
+        x[right] = x_break
+    else:
+        x[right] = x_break + (xmax - x_break) * (t[right] - left_frac) / (1 - left_frac)
+
+    return x
+
+
+# -----------------------------------
+# one density overlay plot for samples
+# -----------------------------------
+def density_overlay_piecewise_axis(
+    df,
+    max_samples=None,
+    bandwidth_adjust=1.0,
+    x_break=1000.0,
+    left_frac=0.75,
+    figsize=(10, 6)
+):
+    samples = df.columns if max_samples is None else df.columns[:max_samples]
+
+    # use positive values only for KDE
+    positive_max = df[df > 0].max().max()
+    xmax = float(positive_max) * 1.05
+
+    # grid in original data units
+    x_grid = np.linspace(0, xmax, 800)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for s in samples:
+        vals = df[s].to_numpy()
+        vals = vals[vals > 0]
+
+        if len(vals) < 2 or len(np.unique(vals)) < 2:
+            continue
+
+        kde = gaussian_kde(vals)
+        kde.set_bandwidth(kde.factor * bandwidth_adjust)
+        y = kde(x_grid)
+
+        # normalize each curve for visibility
+        # y = y / y.max()
+
+        # transform x for plotting
+        t_grid = forward_transform(x_grid, x_break=x_break, xmax=xmax, left_frac=left_frac)
+
+        ax.plot(t_grid, y, alpha=0.15, linewidth=1)
+
+    # mark the 1000 anchor
+    t_break = forward_transform(np.array([x_break]), x_break=x_break, xmax=xmax, left_frac=left_frac)[0]
+    ax.axvline(t_break, linestyle="--", linewidth=2)
+
+    # custom ticks in original units
+    tick_values = np.array([0, 250, 500, 750, 1000, 1500, 2000, 3000, 5000])
+    tick_values = tick_values[tick_values <= xmax]
+    tick_positions = forward_transform(tick_values, x_break=x_break, xmax=xmax, left_frac=left_frac)
+
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels([f"{int(v)}" for v in tick_values])
+
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("UQ-normalized expression")
+    ax.set_ylabel("Scaled density")
+    ax.set_title("Sample density overlays with piecewise x-axis")
+    ax.grid(axis="y", alpha=0.2)
+
+    plt.tight_layout()
+    return fig, ax
+
+
+# Example call:
+# fig, ax = density_overlay_piecewise_axis(df, max_samples=60)
+# plt.show()
+```
+
+```{python}
+#| label: analyze-data-box-plot-builder
+#| eval: false
+#| display: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# --------------------------------------------------
+# data: rows = genes, columns = samples
+# --------------------------------------------------
+df = X.copy()
+
+# --------------------------------------------------
+# piecewise continuous transform breakpoints
+# --------------------------------------------------
+xMin = 0.0
+Q3 = 1000.0
+U  = 1500.0
+E  = 2500.0
+xMax = 5000.0
+
+# widths:
+# 0 -> Q3         : 75%
+# Q3 -> U         : 75% of remaining
+# U -> E          : 75% of remaining
+# E -> M          : remainder
+w1 = 0.75
+w2 = 0.75 * (1 - w1)              # 0.1875
+w3 = 0.75 * (1 - w1 - w2)         # 0.046875
+w4 = 1 - w1 - w2 - w3             # 0.015625
+
+def forward_transform(x, Q3=1000.0, U=1500.0, E=2500.0, M=5000.0):
+    x = np.asarray(x, dtype=float)
+    t = np.empty_like(x)
+
+    s1 = x <= Q3
+    s2 = (x > Q3) & (x <= U)
+    s3 = (x > U) & (x <= E)
+    s4 = x > E
+
+    t[s1] = w1 * (x[s1] / Q3)
+    t[s2] = w1 + w2 * (x[s2] - Q3) / (U - Q3)
+    t[s3] = w1 + w2 + w3 * (x[s3] - U) / (E - U)
+    t[s4] = w1 + w2 + w3 + w4 * (x[s4] - E) / (M - E)
+
+    return t
+
+# --------------------------------------------------
+# order samples by median of expressed genes only
+# --------------------------------------------------
+sample_medians = {}
+zero_counts = {}
+
+for s in df.columns:
+    raw = df[s].to_numpy(dtype=float)
+    zero_counts[s] = np.sum(raw == 0)
+
+    vals = raw[np.isfinite(raw) & (raw > 0)]
+    sample_medians[s] = np.median(vals) if len(vals) > 0 else np.nan
+
+sample_medians = dict(sorted(sample_medians.items(), key=lambda kv: kv[1]))
+ordered_samples = list(sample_medians.keys())
+
+# --------------------------------------------------
+# global maximum over expressed genes only
+# --------------------------------------------------
+all_vals = df.to_numpy(dtype=float)
+all_pos = all_vals[np.isfinite(all_vals) & (all_vals > 0)]
+M = float(all_pos.max())
+
+# --------------------------------------------------
+# plot
+# --------------------------------------------------
+n = len(ordered_samples)
+fig_height = max(12, n * 0.20)
+
+fig, axes = plt.subplots(
+    nrows=n,
+    ncols=1,
+    figsize=(10, fig_height),
+    sharex=True
+)
+
+if n == 1:
+    axes = [axes]
+
+for ax, s in zip(axes, ordered_samples):
+    raw = df[s].to_numpy(dtype=float)
+    vals = raw[np.isfinite(raw) & (raw > 0)]
+
+    if len(vals) == 0:
+        continue
+
+    vals_t = forward_transform(vals, Q3=Q3, U=U, E=E, M=M)
+
+    ax.boxplot(
+        vals_t,
+        vert=False,
+        widths=0.6,
+        showfliers=True
+    )
+
+    ax.set_yticks([1])
+    ax.set_yticklabels([f"{s}  (zeros={zero_counts[s]})"], fontsize=7)
+
+    # reference lines
+    for v, ls in [(Q3, "--"), (U, ":"), (E, "-.")]:
+        ax.axvline(
+            forward_transform([v], Q3=Q3, U=U, E=E, M=M)[0],
+            linestyle=ls,
+            linewidth=0.8,
+            alpha=0.7
+        )
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.grid(axis="x", alpha=0.2)
+
+# --------------------------------------------------
+# custom ticks in original units
+# --------------------------------------------------
+tick_vals = np.array([0, 250, 500, 750, 1000, 1500, 2500], dtype=float)
+tick_pos = forward_transform(tick_vals, Q3=Q3, U=U, E=E, M=M)
+
+axes[-1].set_xticks(tick_pos)
+axes[-1].set_xticklabels([str(int(v)) for v in tick_vals])
+axes[-1].set_xlabel("RSEM UQ expression (expressed genes only; piecewise display scale)")
+
+fig.suptitle(
+    "Samples ordered by median expressed-gene expression\n"
+    "Zeros removed for plotting; zero counts shown in labels",
+    y=0.999
+)
+
+plt.tight_layout()
+plt.show()
+```
+
+
 ## Looking at some data
 ### Upper quartile per sample
 
@@ -2902,80 +4964,7 @@ cv
 
 
 ## Exploration
-```{python}
-df = df_mrna_seq.copy()
-df = df.set_index("Hugo_Symbol")
 
-X = df.apply(pd.to_numeric, errors="coerce")
-
-def uq_nonzero(col):
-    v = col.dropna()
-    v = v[v > 0]
-    if len(v) == 0:
-        return np.nan
-    return np.quantile(v, 0.75)
-
-uq_original = X.apply(uq_nonzero, axis=0)
-
-
-# Artificially create fake raw counts
-
-rng = np.random.default_rng(42)
-
-fake_scale = pd.Series(
-    rng.uniform(0.5, 2.0, size=X.shape[1]),
-    index=X.columns
-)
-
-X_fake_raw = X.mul(fake_scale, axis=1)
-
-
-
-
-
-uq_fake = X_fake_raw.apply(uq_nonzero, axis=0)
-
-plt.figure(figsize=(6,4))
-plt.hist(uq_fake.dropna().values, bins=40)
-plt.title("Fake Raw Data: UQ Spread Out")
-plt.xlabel("UQ value")
-plt.ylabel("Samples")
-plt.tight_layout()
-plt.show()
-
-
-
-
-target = np.nanmedian(uq_fake.values)
-
-X_fake_uq = X_fake_raw.div(uq_fake, axis=1) * target
-
-
-
-
-uq_after = X_fake_uq.apply(uq_nonzero, axis=0)
-
-plt.figure(figsize=(6,4))
-plt.hist(uq_after.dropna().values, bins=40)
-plt.title("After UQ Normalization: UQ Tight Again")
-plt.xlabel("UQ value")
-plt.ylabel("Samples")
-plt.tight_layout()
-plt.show()
-
-
-
-
-plt.figure(figsize=(6,4))
-plt.hist(uq_fake.dropna().values, bins=40, alpha=0.5, label="Fake Raw")
-plt.hist(uq_after.dropna().values, bins=40, alpha=0.5, label="After UQ")
-plt.legend()
-plt.title("Effect of UQ Normalization")
-plt.xlabel("UQ value")
-plt.ylabel("Samples")
-plt.tight_layout()
-plt.show()
-```
 
 1. Isolate
    1. Tumor Sample --> RNA
@@ -3488,3 +5477,245 @@ gridApi
 :::{#myGrid .ag-theme-quartz style="height: 500px;"}
 
 :::
+
+
+
+
+
+
+
+
+## OLD
+
+
+
+```{python}
+#| eval: false
+#| output: false
+
+## Exploring multiple genes across samples. 
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+# -----------------------------
+# helper: resolve selected genes
+# -----------------------------
+def resolve_genes(X, genes=None):
+    """
+    genes can be:
+      - None                  -> all genes
+      - list of gene names    -> used directly
+      - pandas Index          -> used directly
+    """
+    if genes is None:
+        return list(X.index)
+    return list(genes)
+
+
+# -----------------------------
+# helper: collect per-gene data
+# -----------------------------
+def collect_gene_data(X, genes):
+    rows = []
+
+    for gene in genes:
+        raw = X.loc[gene].to_numpy(dtype=float)
+        vals = raw[np.isfinite(raw) & (raw > 0)]   # expressed values only
+        zero_count = int(np.sum(raw == 0))
+
+        if len(vals) == 0:
+            rows.append({
+                "gene": gene,
+                "zero_count": zero_count,
+                "vals": np.array([]),
+                "vals_log1p": np.array([]),
+                "sd": np.nan,
+                "cv": np.nan,
+                "mean": np.nan,
+                "median": np.nan,
+                "iqr": np.nan,
+                "mad": np.nan,
+                "q1": np.nan,
+                "q3": np.nan,
+                "min": np.nan,
+                "max": np.nan,
+                "skew_like": np.nan,
+            })
+            continue
+
+        q1 = np.percentile(vals, 25)
+        q3 = np.percentile(vals, 75)
+        median = np.median(vals)
+        mean = np.mean(vals)
+        sd = np.std(vals, ddof=1) if len(vals) > 1 else 0.0
+        cv = sd / mean if mean > 0 else np.nan
+        iqr = q3 - q1
+        mad = np.median(np.abs(vals - median))
+        skew_like = (q3 - median) - (median - q1)   # simple quartile asymmetry
+
+        rows.append({
+            "gene": gene,
+            "zero_count": zero_count,
+            "vals": vals,
+            "vals_log1p": np.log1p(vals),
+            "sd": sd,
+            "cv": cv,
+            "mean": mean,
+            "median": median,
+            "iqr": iqr,
+            "mad": mad,
+            "q1": q1,
+            "q3": q3,
+            "min": np.min(vals),
+            "max": np.max(vals),
+            "skew_like": skew_like,
+        })
+
+    return rows
+
+
+# -----------------------------
+# stacked horizontal boxplots
+# -----------------------------
+def plot_gene_boxplots(rows, value_key, xlabel, title, figsize_width=10, row_height=0.28):
+    n = len(rows)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(figsize_width, fig_height), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    for ax, row in zip(axes, rows):
+        vals = row[value_key]
+
+        if len(vals) > 0:
+            ax.boxplot(vals, vert=False, widths=0.6, showfliers=True)
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([f"{row['gene']}  (zeros={row['zero_count']})"], fontsize=7)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    plt.tight_layout()
+    plt.show()
+
+
+# -----------------------------
+# stacked one-number-per-gene plot
+# -----------------------------
+def plot_gene_metric(rows, metric_key, xlabel, title, standard_normal=False, figsize_width=10, row_height=0.28):
+    metric = np.array([row[metric_key] for row in rows], dtype=float)
+
+    if standard_normal:
+        mu = np.nanmean(metric)
+        sigma = np.nanstd(metric, ddof=1)
+        metric_plot = (metric - mu) / sigma if sigma > 0 else metric * np.nan
+        ref_line = 0.0
+        xlabel = f"{xlabel} (z-score)"
+    else:
+        metric_plot = metric
+        ref_line = None
+
+    n = len(rows)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(figsize_width, fig_height), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    for ax, row, x in zip(axes, rows, metric_plot):
+        if np.isfinite(x):
+            ax.hlines(y=1, xmin=0 if not standard_normal else min(0, x), xmax=x, linewidth=1.4)
+            ax.plot(x, 1, "o", markersize=4)
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([f"{row['gene']}  (zeros={row['zero_count']})"], fontsize=7)
+
+        if ref_line is not None:
+            ax.axvline(ref_line, linestyle="--", linewidth=0.8, alpha=0.6)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    plt.tight_layout()
+    plt.show()
+
+
+# -----------------------------
+# main driver
+# -----------------------------
+def plot_selected_genes_suite_no(X, genes=None):
+    genes = resolve_genes(X, genes)
+    rows = collect_gene_data(X, genes)
+
+    # Plot 1: raw expressed values
+    plot_gene_boxplots(
+        rows,
+        value_key="vals",
+        xlabel="RSEM UQ expression (expressed values only)",
+        title="Gene distributions across samples: raw expressed values"
+    )
+
+    # Plot 2: transformed expressed values
+    plot_gene_boxplots(
+        rows,
+        value_key="vals_log1p",
+        xlabel="log(1 + RSEM UQ expression)",
+        title="Gene distributions across samples: log1p-transformed expressed values"
+    )
+
+    # Plot 3: SD
+    plot_gene_metric(
+        rows,
+        metric_key="sd",
+        xlabel="Standard deviation across samples",
+        title="Per-gene standard deviation across samples",
+        standard_normal=False
+    )
+
+    # Plot 4: SD z-score
+    plot_gene_metric(
+        rows,
+        metric_key="sd",
+        xlabel="Standard deviation across samples",
+        title="Per-gene standard deviation across samples: standard-normal transformed",
+        standard_normal=True
+    )
+
+    # Plot 5: CV
+    plot_gene_metric(
+        rows,
+        metric_key="cv",
+        xlabel="Coefficient of variation across samples",
+        title="Per-gene coefficient of variation across samples",
+        standard_normal=False
+    )
+
+    return rows
+
+
+# -----------------------------
+# examples
+# -----------------------------
+# first 20 genes by position
+# rows = plot_selected_genes_suite(X, genes=X.index[:20])
+
+# specific named genes
+# rows = plot_selected_genes_suite(X, genes=["TP53", "EGFR", "IDH1"])
+
+# a slice by iloc
+# rows = plot_selected_genes_suite(X, genes=X.iloc[1:100].index)
+```

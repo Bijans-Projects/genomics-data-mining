@@ -5,7 +5,7 @@ project:
     port: 4200
     browser: true
   render:
-    - index.qmd
+    - index_cleaned.qmd
 
 website:
   site-url: https://bijans-projects.github.io/genomics-data-mining
@@ -22,13 +22,13 @@ website:
   reader-mode: true
   navbar:
     left:
-      - index.qmd
+      - index_cleaned.qmd
     tools:
       - icon: github
         href: https://github.com/Bijans-Projects
         text: Bijans Projects GitHub
 
-jupyter: genomics-data-mining
+jupyter: pixi-kernel-python3
 
 format:
   html:
