@@ -3646,7 +3646,19 @@ X = set_expression_matrix_index(df_mrna_seq)
 rows, all_metrics, saved = plot_selected_genes_suite(
     X,
     genes=X.index[:20],
-    figures={"expr_pos", "cv_pos", "ecdf_z_pos"},
+    figures={"expr_all",
+    "expr_pos",
+    "expr_log_all",
+    "expr_log_pos",
+    "sd_all",
+    "sd_pos",
+    "sdz_all",
+    "sdz_pos",
+    "cv_all",
+    "cv_pos",
+    "ecdf_all",
+    "ecdf_pos",
+    "ecdf_z_pos"},
     output_dir="plots_20_genes",
     save=True,
     show=True,
@@ -3866,6 +3878,206 @@ plt.show()
 
 
 ## Dimension Reduction
+
+```{python}
+from scipy.stats import median_abs_deviation
+
+
+## Median Absolute Deviation (single gene: ERBB2)
+X = df_gene_expr_by_sample.copy()
+
+# select ERBB2 (handles MultiIndex)
+idx = pd.IndexSlice
+erbb2_df = X.loc[idx[:, ["ERBB2"], :]]
+
+# flatten values
+vals = pd.to_numeric(erbb2_df.to_numpy().ravel(), errors="coerce")
+vals = vals[np.isfinite(vals) & (vals > 0)]
+
+mad_erbb2 = median_abs_deviation(vals, scale="normal")  # scale="normal" optional
+
+print("ERBB2 MAD:", mad_erbb2)
+```
+```{python}
+from scipy.stats import median_abs_deviation
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+# =========================================================
+# Setup
+# =========================================================
+X = df_gene_expr_by_sample.copy()
+
+# =========================================================
+# 1) Median Absolute Deviation for a single gene: ERBB2
+# =========================================================
+idx = pd.IndexSlice
+erbb2_df = X.loc[idx[:, ["ERBB2"], :]]
+
+vals = pd.to_numeric(erbb2_df.to_numpy().ravel(), errors="coerce")
+vals = vals[np.isfinite(vals) & (vals > 0)]
+
+mad_erbb2_raw = median_abs_deviation(vals, scale="normal")
+mad_erbb2_log = median_abs_deviation(np.log1p(vals), scale="normal")
+
+print("ERBB2 MAD (raw):", mad_erbb2_raw)
+print("ERBB2 MAD (log1p):", mad_erbb2_log)
+
+# =========================================================
+# 2) MAD for all genes
+# =========================================================
+gene_mad_raw = {}
+gene_mad_log = {}
+
+for gene in X.index:
+    vals = pd.to_numeric(X.loc[gene], errors="coerce").to_numpy(dtype=float)
+    vals = vals[np.isfinite(vals) & (vals > 0)]
+
+    if len(vals) == 0:
+        gene_mad_raw[gene] = np.nan
+        gene_mad_log[gene] = np.nan
+    else:
+        gene_mad_raw[gene] = median_abs_deviation(vals, scale="normal")
+        gene_mad_log[gene] = median_abs_deviation(np.log1p(vals), scale="normal")
+
+gene_mad_raw = pd.Series(gene_mad_raw, name="MAD_raw").dropna().sort_values(ascending=False)
+gene_mad_log = pd.Series(gene_mad_log, name="MAD_log").dropna().sort_values(ascending=False)
+
+top_genes_raw = gene_mad_raw.head(2000).index
+top_genes_log = gene_mad_log.head(2000).index
+
+# Optional: inspect top genes
+print("\nTop 10 genes by raw MAD:")
+print(gene_mad_raw.head(10))
+
+print("\nTop 10 genes by log MAD:")
+print(gene_mad_log.head(10))
+
+# =========================================================
+# 3) PCA using top genes selected by RAW MAD
+#    PCA is done on log1p-transformed values for stability
+# =========================================================
+X_raw = X.loc[top_genes_raw].T
+X_raw = X_raw.apply(pd.to_numeric, errors="coerce")
+X_raw = np.log1p(X_raw)
+
+scaler_raw = StandardScaler()
+X_raw_scaled = scaler_raw.fit_transform(X_raw)
+
+pca_raw = PCA(n_components=2)
+X_pca_raw = pca_raw.fit_transform(X_raw_scaled)
+
+print("\nExplained variance ratio (RAW MAD selection):", pca_raw.explained_variance_ratio_)
+print("Total explained by PC1 + PC2 (RAW MAD selection):", pca_raw.explained_variance_ratio_.sum())
+
+# =========================================================
+# 4) PCA using top genes selected by LOG MAD
+# =========================================================
+X_log = X.loc[top_genes_log].T
+X_log = X_log.apply(pd.to_numeric, errors="coerce")
+X_log = np.log1p(X_log)
+
+scaler_log = StandardScaler()
+X_log_scaled = scaler_log.fit_transform(X_log)
+
+pca_log = PCA(n_components=2)
+X_pca_log = pca_log.fit_transform(X_log_scaled)
+
+print("\nExplained variance ratio (LOG MAD selection):", pca_log.explained_variance_ratio_)
+print("Total explained by PC1 + PC2 (LOG MAD selection):", pca_log.explained_variance_ratio_.sum())
+
+# =========================================================
+# 5) Build plotting data
+# =========================================================
+df_plot_raw = pd.DataFrame(
+    X_pca_raw,
+    index=X_raw.index,
+    columns=["PC1", "PC2"]
+).join(df_sample_meta[["SUBTYPE"]])
+
+df_plot_log = pd.DataFrame(
+    X_pca_log,
+    index=X_log.index,
+    columns=["PC1", "PC2"]
+).join(df_sample_meta[["SUBTYPE"]])
+
+df_plot_raw["SUBTYPE"] = df_plot_raw["SUBTYPE"].fillna("NA")
+df_plot_log["SUBTYPE"] = df_plot_log["SUBTYPE"].fillna("NA")
+
+# =========================================================
+# 6) Plot side-by-side
+# =========================================================
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True)
+
+plot_info = [
+    (
+        axes[0],
+        df_plot_raw,
+        "Top 2000 genes by RAW MAD",
+        pca_raw.explained_variance_ratio_
+    ),
+    (
+        axes[1],
+        df_plot_log,
+        "Top 2000 genes by LOG MAD",
+        pca_log.explained_variance_ratio_
+    ),
+]
+
+for ax, df_plot, title, evr in plot_info:
+    for subtype, group in df_plot.groupby("SUBTYPE"):
+        ax.scatter(
+            group["PC1"],
+            group["PC2"],
+            label=subtype,
+            alpha=0.7
+        )
+
+    ax.set_title(
+        f"{title}\nPC1={evr[0]:.2%}, PC2={evr[1]:.2%}",
+        fontsize=11
+    )
+    ax.set_xlabel("PC1")
+    ax.set_ylabel("PC2")
+    ax.grid(alpha=0.2)
+
+axes[1].legend(title="Subtype")
+plt.tight_layout()
+plt.show()
+
+
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+axes[0].hist(gene_mad_raw, bins=50)
+axes[0].set_title("MAD on raw values")
+axes[0].set_xlabel("MAD")
+axes[0].set_ylabel("Number of genes")
+
+axes[1].hist(gene_mad_log, bins=50)
+axes[1].set_title("MAD on log1p values")
+axes[1].set_xlabel("MAD")
+
+plt.tight_layout()
+plt.show()
+```
+
+**Median Absolute Deviation (MAD)**
+
+MAD measures how much a gene varies across samples relative to its median value. It is computed as the median of the absolute deviations from the median.
+
+A low MAD means the gene is relatively stable across samples. A high MAD means the gene varies more across samples and may therefore be more informative for distinguishing biological groups. MAD is useful because it is more robust to extreme values than variance or standard deviation.
+
+**Why use log transform before or during selection**
+
+mRNA expression data are often strongly right-skewed, with a small number of very large values. A log transform compresses the upper tail and reduces the influence of extreme values. This helps make variability measures and PCA focus more on pattern than on sheer magnitude.
+
+**Explained Variance Ratio**
+
+The explained variance ratio tells us how much of the total variation in the data is captured by each principal component. For example, if PC1 explains 25% of the variation and PC2 explains 12%, then the first two components together summarize 37% of the overall structure in the selected genes.
 
 ```{ojs}
 //| label: section-div-05
