@@ -7,7 +7,7 @@ From the root directory run the following commands:
 ```powershell
 conda build .\packages\cbioportal_python_client\ --output-folder .\conda-channel\
 conda index .\conda-channel\
-conda env create --prefix .\env --file environment.yml
+conda env create --no-default-packages --prefix .\env --file environment.yml
 conda activate .\env
 python -m ipykernel install --user --name genomics-data-mining --display-name "Python (Conda: -p .\env genomics-data-mining)"
 ```
@@ -23,6 +23,7 @@ conda config --set env_prompt '({name})'
 ## Reset
 
 ```powershell
+conda deactivate
 conda remove --prefix .\env --all
 ```
 

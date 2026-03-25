@@ -1,0 +1,4816 @@
+---
+title: Genomics Data Mining
+---
+
+## Before we begin
+
+In order to follow along, you must have followed the setup instructions. 
+
+### Expectations
+
+#### Statistics
+We expect a fundamental understanding of statistics including random distributions, sampling, linear regressions (simple and multivariate), bias, and variance.
+
+Statistics is the science and art of transforming data into actionable insight and sound judgement. 
+
+The data journey can be summarized as:
+```{dot}
+//| label: fig-data-journey
+//| fig-cap: "The Data Journey"
+//| fig-height: 100%
+//| fig-width: 100%
+
+digraph {
+    rankdir=LR;
+    
+    graph[class="dot-default-graph"]
+    node [class="dot-default-node"]
+    edge [class="dot-default-edge"]
+
+    Data -> Information -> Knowledge -> Wisdom
+}
+```
+
+**Data**
+: Raw facts, signals, or symbols, such as numbers or measurements which have little meaning in isolation.  
+    *Example: 98*  
+
+**Information**
+: Data that is processed, structured, and given context, making it meaningful.  
+    *Example: The patient's weight is 98 kg*  
+
+**Knowledge**
+: Information that is understood and applied through experience.  
+    *Example: The patient is overweight, requiring a higher dose of medication.*  
+
+**Wisdom**
+: Utilizing knowledge and experience to make sound judgements, decisions, and future-oriented actions.  
+    *Example: Deciding to combine the medical treatment with a personalized lifestyle intervention plan, recognizing that treating the root cause of the weight is more effective for the patient's long-term health than simply increasing their medication.*  
+
+#### Coding
+We expect a basic understanding of programming (we use Python, but any programming language will do).  
+Only functions that are created within this project will have documentation, otherwise you are expected to be able to read and understand what they are doing through their own official documentation.
+
+#### Biology
+We are only looking at **human biology**, and expect you to know at least the following: 
+
+Genome
+: The complete set of DNA for a human
+
+Chromosome
+: A packaged unit of DNA
+: Humans have 46 chromosomes, which are made up of 23 pairs
+: Each chromosome is one single (long) DNA molecule
+
+DNA
+: The data (that stores biological information)
+: Has two strands
+: Made up of four chemicals
+    A: Adenine
+    C: Cytosine
+    G: Guanine
+    T: Thymine
+: Located primarily in a cell's nucleus
+
+Gene
+: A specific section of DNA that contains instructions to make something
+
+RNA
+: A temporary working copy a Gene
+: Only has one strand
+: Can leave the nucleus
+: There are many types of RNA
+
+Protein
+: Built from RNA instructions
+: Perform most functions of the cell
+
+Cell
+: The basic unit of life
+: Different cells use different genes (in different quantities)
+: All cells have the same DNA
+
+Tissue
+: A group of similar cells working together
+
+### Focus
+
+High-dimensional statistical inference is not a single analysis - it is a sequence of transformations, each introducing assumptions. 
+
+The conclusions are properties of the entire pipeline, not just the data.
+
+When our data has a lot of dimensions, and the relationships between them is complex, are our conclusions true to the underlying structure or consequences of our pipeline/decisions?
+
+In order to compare if these decisions resulted in different conclusions, we will consider gene expression in determening cancer subtype (i.e., classification) under different pipeline decisions, using Accuracy.
+For example: 
+
+Pipeline 1: 
+- Data cleansing: Removed all genes with a gene expression < 30
+- Dimensional Reduction: PCA (50 components)
+
+Once classification has been done, we will compare the results over many repeated trials (?? are these methods deterministic - I don't think so ). 
+
+TODO: Investigate if paired design makes sense. PRoblem: simple splits are simple. But the comparisons grow exponentially (2^n, where n is every time we have a difference)
+
+
+
+
+```{=html}
+<div class="column-screen-inset">
+    <svg viewBox="0 0 1600 900" width="100%" style="max-width:1100px; display:block; margin: 2rem auto;">
+    <defs>
+        <!-- Background gradient -->
+        <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+        <stop offset="0%" stop-color="#161a22"/>
+        <stop offset="55%" stop-color="#0b0e14"/>
+        <stop offset="100%" stop-color="#05060a"/>
+        </radialGradient>
+
+        <!-- Soft spotlight -->
+        <radialGradient id="spot" cx="50%" cy="25%" r="60%">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+        <stop offset="60%" stop-color="#ffffff" stop-opacity="0.03"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+
+        <!-- Film grain -->
+        <filter id="grain">
+        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
+        <feColorMatrix type="matrix" values="
+            1 0 0 0 0
+            0 1 0 0 0
+            0 0 1 0 0
+            0 0 0 0.12 0"/>
+        </filter>
+
+        <!-- Text glow -->
+        <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+        </filter>
+
+        <!-- Subtle vignette -->
+        <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+        <stop offset="65%" stop-color="#000" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0.55"/>
+        </radialGradient>
+    </defs>
+
+    <!-- Background -->
+    <rect width="1600" height="900" fill="url(#bg)"/>
+    <rect width="1600" height="900" fill="url(#spot)"/>
+    <rect width="1600" height="900" fill="url(#vig)"/>
+
+    <!-- Grain overlay -->
+    <rect width="1600" height="900" filter="url(#grain)" opacity="0.45"/>
+
+    <!-- Title -->
+    <g font-family="system-ui, -apple-system, Segoe UI, Inter, Arial" text-anchor="middle">
+        <text x="800" y="185" font-size="64" letter-spacing="8" fill="#cfd6e6" opacity="0.9">
+        ARE WE
+        </text>
+
+        <text x="800" y="360" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
+        DISCOVERING
+        </text>
+
+        <text x="800" y="470" font-size="46" letter-spacing="10" fill="#cfd6e6" opacity="0.95">
+        — OR —
+        </text>
+
+        <text x="800" y="645" font-size="128" font-weight="800" letter-spacing="3" fill="#ffffff" filter="url(#glow)">
+        CONSTRUCTING
+        </text>
+
+        <text x="800" y="760" font-size="44" letter-spacing="2" fill="#cfd6e6" opacity="0.95">
+        THE STRUCTURE WE SEE?
+        </text>
+    </g>
+    </svg>
+</div>
+```
+
+
+## Setup
+
+```{ojs}
+//| label: section-div-01
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div class="current">Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Exploratory Analysis</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Validation</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+Establishing a reproducible analysis environment.
+
+```{python}
+#| label: analyze-setup-debugger
+#| eval: false
+#| output: true
+
+# Used if needed to debut environment issues
+
+import sys, os, site
+print("exe:", sys.executable)
+from itables.options import maxBytes
+print("ver:", sys.version)
+print("prefix:", sys.prefix)
+print("base_prefix:", sys.base_prefix)
+print("cwd:", os.getcwd())
+print("usersite:", site.getusersitepackages())
+
+
+for k in ["PYTHONHOME", "PYTHONPATH", "CONDA_PREFIX", "VIRTUAL_ENV"]:
+    print(k, "=", os.environ.get(k))
+
+
+import os, shutil, subprocess
+from pathlib import Path
+
+print("sys.executable:", sys.executable)
+print("CONDA_PREFIX:", os.getenv("CONDA_PREFIX"))
+print("CONDA_PREFIX_1:", os.getenv("CONDA_PREFIX_1"))
+print("CONDA_EXE:", os.getenv("CONDA_EXE"))
+print("which conda:", shutil.which("conda"))
+
+# Try common locations
+candidates = []
+if os.getenv("CONDA_EXE"):
+    candidates.append(os.getenv("CONDA_EXE"))
+if os.getenv("CONDA_PREFIX_1"):
+    candidates.append(str(Path(os.getenv("CONDA_PREFIX_1")) / "Scripts" / "conda.exe"))
+if os.getenv("CONDA_ROOT"):
+    candidates.append(str(Path(os.getenv("CONDA_ROOT")) / "Scripts" / "conda.exe"))
+
+print("\nCandidates:")
+for c in candidates:
+    print(" ", c, "exists=", Path(c).exists())
+
+# Try running conda directly if we found one
+conda = next((c for c in candidates if Path(c).exists()), None) or shutil.which("conda")
+print("\nResolved conda:", conda)
+
+if conda:
+    p = subprocess.run([conda, "--version"], capture_output=True, text=True)
+    print("conda --version rc:", p.returncode)
+    print("stdout:", p.stdout.strip())
+    print("stderr:", p.stderr.strip())
+else:
+    print("No conda found in this process.")
+
+
+
+```
+
+### Package Imports
+
+```{python}
+#| label: analyze-setup-packages
+#| eval: true
+#| output: false
+
+# --- Standard library ---
+import importlib.metadata
+import importlib
+import json
+import os
+import platform
+import random
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+from pathlib import Path
+from urllib.parse import urlsplit
+
+# --- Third-party ---
+import itables
+import numpy as np
+import pandas as pd
+import requests
+import sklearn
+import yaml
+from IPython.display import Markdown, display
+import matplotlib.pyplot as plt
+
+# --- Currently Testing ---
+import time
+import cbioportal
+from cbioportal.rest import ApiException
+from pprint import pprint
+
+# --- Local / project ---
+import config
+
+importlib.reload(config)
+```
+
+### Custom Objects
+```{python}
+#| label: analyze-setup-custom-objects
+#| eval: true
+#| output: false
+
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict
+
+@dataclass
+class CancerStudy:
+    # Core identity
+    study_id: str
+    study_name: str
+    description: Optional[str]
+
+    # Cancer classification
+    cancer_type_id: Optional[str]
+    cancer_type_name: Optional[str]
+
+    # Clinical summary
+    sample_count: Optional[int] = None
+    patient_count: Optional[int] = None
+
+    # Data modalities present
+    data_types: List[str] = field(default_factory=list)
+
+    # Provenance
+    reference: Optional[str] = None
+    citation: Optional[str] = None
+    pmid: Optional[str] = None
+
+    # Internal / system metadata
+    source_url: Optional[str] = None
+    raw_meta: Dict[str, str] = field(default_factory=dict)
+
+```
+
+### Parameters
+
+:::{.callout-note}
+
+Most parameters are defined in the config.py file, and will eventually be part of environment variables
+
+:::
+
+```{python}
+#| label: analyze-setup-parameters
+#| eval: true
+#| output: true
+
+# Parameters
+RANDOM_SEED = 3660
+```
+
+### Package Defaults / Options
+
+```{python}
+#| label: analyze-setup-package-options
+#| eval: true
+#| output: false
+
+# ITables
+# itables.init_notebook_mode()
+itables.options.autoWidth = False
+itables.options.style = "table-layout:auto;width:100%;margin:auto"
+
+# Pandas
+pd.set_option("display.max_rows", 30)
+pd.set_option("display.max_columns", 50)
+pd.set_option("display.width", 120)
+pd.set_option("display.max_colwidth", 60)
+
+# Randomness
+os.environ["PYTHONHASHSEED"] = str(RANDOM_SEED)
+random.seed(RANDOM_SEED)
+np.random.seed(RANDOM_SEED)
+# Note for later:
+# - use random_state=RANDOM_SEED in sklearn models
+# - TSNE(random_state=RANDOM_SEED)
+# - train_test_split(..., random_state=RANDOM_SEED)
+
+# Others 
+# ...
+```
+
+### Helper Functions
+
+```{python}
+#| label: analyze-setup-helper-functions
+#| eval: true
+#| output: false
+
+
+
+def download_and_extract_studies(*study_ids: str) -> list[Path]:
+    return [_download_and_extract_study(study) for study in study_ids]
+
+
+def _download_and_extract_study(study_id: str):
+    url = f"{config.DATAHUB_BASE}/{study_id}.tar.gz"
+    dataset_file = download_dataset(url)
+    dataset_path = extract_dataset(dataset_file)
+    return dataset_path
+
+
+def download_dataset(url, /, *, folder: Path = config.DEFAULT_DATASET_DOWNLOAD_FOLDER, force: bool = False) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+
+    filename = Path(urlsplit(url).path).name
+    target = folder / filename
+
+    if force or not target.exists():
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        with target.open("wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+    return target
+
+
+def extract_dataset(file: Path, /, *, folder: Path = config.DEFAULT_DATASET_EXTRACT_FOLDER, force: bool = False) -> Path:
+    base_name = file.name.removesuffix(".tar.gz")
+    extract_path = folder / base_name
+
+    folder.mkdir(parents=True, exist_ok=True)
+
+    if force or not extract_path.exists():
+        with tarfile.open(file, "r:gz") as tar:
+            tar.extractall(folder)
+
+    return extract_path
+
+
+# =========================================================
+# figure saving / cleanup
+# =========================================================
+def slugify(text: str) -> str:
+    text = str(text).strip().lower()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[-\s]+", "_", text)
+    return text
+
+
+def finalize_figure(
+    fig,
+    title,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    """
+    Save, optionally show, then optionally close a matplotlib figure.
+    Returns saved filepath as string, else None.
+    """
+    saved_path = None
+
+    if save and output_dir is not None:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{slugify(title)}.{ext}"
+        saved_path = output_dir / filename
+        fig.savefig(saved_path, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+    if close:
+        plt.close(fig)
+
+    return str(saved_path) if saved_path is not None else None
+
+
+# =========================================================
+# dataframe helpers
+# =========================================================
+def set_expression_matrix_index(df):
+    """
+    Returns a copy of the df with a MultiIndex:
+      level 0: original row number
+      level 1: Hugo_Symbol
+      level 2: Entrez_Gene_Id
+
+    Hugo_Symbol missing values are replaced with 'No-Hugo'.
+    Entrez_Gene_Id is converted to nullable integer/object so missing values are preserved.
+    """
+    out = df.copy()
+    out["Hugo_Symbol"] = out["Hugo_Symbol"].fillna("No-Hugo")
+    out["Entrez_Gene_Id"] = out["Entrez_Gene_Id"].astype("Int64").astype(object)
+    out = out.reset_index(drop=True).set_index(["Hugo_Symbol", "Entrez_Gene_Id"], append=True)
+    return out
+
+
+def wide_expression_to_long(
+    X,
+    sample_metadata=None,
+    gene_id_name="gene_id",
+    sample_id_name="sample_id",
+    value_name="expression",
+):
+    """
+    Convert a genes x samples matrix to long format.
+    """
+    long_df = (
+        X.reset_index(names=gene_id_name)
+         .melt(id_vars=gene_id_name, var_name=sample_id_name, value_name=value_name)
+    )
+
+    if sample_metadata is not None:
+        sm = sample_metadata.copy()
+        if sample_id_name not in sm.columns:
+            raise ValueError(f"sample_metadata must contain column '{sample_id_name}'")
+        long_df = long_df.merge(sm, on=sample_id_name, how="left")
+
+    return long_df
+
+
+def build_expression_dataframes(df_mrna_seq, df_clinical_samples, df_clinical_patients):
+    """
+    Build the canonical reusable dataframes:
+      df_gene_meta
+      df_sample_meta
+      df_gene_expr_by_sample
+      df_gene_expr_by_sample_log1p
+      df_sample_expr_by_gene
+      df_sample_expr_by_gene_log1p
+      df_sample_expr__gene_expr
+    """
+    df_mrna_seq_indexed = set_expression_matrix_index(df_mrna_seq.copy())
+
+    sample_cols = [c for c in df_mrna_seq.columns if c not in ["Hugo_Symbol", "Entrez_Gene_Id"]]
+
+    df_gene_expr_by_sample = (
+        df_mrna_seq_indexed[sample_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .copy()
+    )
+
+    df_gene_expr_by_sample_log1p = np.log1p(df_gene_expr_by_sample)
+
+    df_gene_meta = (
+        df_mrna_seq_indexed
+        .reset_index()[["level_0", "Hugo_Symbol", "Entrez_Gene_Id"]]
+        .rename(columns={"level_0": "row_id"})
+        .copy()
+    )
+
+    df_sample_meta = (
+        df_clinical_samples[["SAMPLE_ID", "PATIENT_ID"]]
+        .merge(
+            df_clinical_patients[["PATIENT_ID", "SUBTYPE"]],
+            on="PATIENT_ID",
+            how="left",
+        )
+        .copy()
+    )
+    df_sample_meta["SUBTYPE"] = df_sample_meta["SUBTYPE"].fillna("NA")
+    df_sample_meta = df_sample_meta.set_index("SAMPLE_ID", drop=True)
+
+    sample_cols_in_both = [c for c in df_gene_expr_by_sample.columns if c in df_sample_meta.index]
+    df_gene_expr_by_sample = df_gene_expr_by_sample[sample_cols_in_both]
+    df_gene_expr_by_sample_log1p = df_gene_expr_by_sample_log1p[sample_cols_in_both]
+
+    df_sample_expr_by_gene = df_gene_expr_by_sample.T.copy()
+    df_sample_expr_by_gene_log1p = df_gene_expr_by_sample_log1p.T.copy()
+    df_sample_expr_by_gene.index.name = "SAMPLE_ID"
+    df_sample_expr_by_gene_log1p.index.name = "SAMPLE_ID"
+
+    common_samples = df_sample_meta.index.intersection(df_sample_expr_by_gene.index)
+
+    df_sample_meta_aligned = df_sample_meta.loc[common_samples].copy()
+    df_sample_expr_by_gene_aligned = df_sample_expr_by_gene.loc[common_samples].copy()
+
+    df_sample_meta_aligned.columns = pd.MultiIndex.from_tuples(
+        [("sample_meta", col, "") for col in df_sample_meta_aligned.columns],
+        names=["row_id", "Hugo_Symbol", "Entrez_Gene_Id"],
+    )
+
+    df_sample_expr_by_gene_aligned.columns = pd.MultiIndex.from_tuples(
+        [(str(a), str(b), str(c)) for a, b, c in df_sample_expr_by_gene_aligned.columns],
+        names=["row_id", "Hugo_Symbol", "Entrez_Gene_Id"],
+    )
+
+    df_sample_expr__gene_expr = pd.concat(
+        [df_sample_meta_aligned, df_sample_expr_by_gene_aligned],
+        axis=1,
+    )
+
+    return {
+        "df_gene_meta": df_gene_meta,
+        "df_sample_meta": df_sample_meta,
+        "df_gene_expr_by_sample": df_gene_expr_by_sample,
+        "df_gene_expr_by_sample_log1p": df_gene_expr_by_sample_log1p,
+        "df_sample_expr_by_gene": df_sample_expr_by_gene,
+        "df_sample_expr_by_gene_log1p": df_sample_expr_by_gene_log1p,
+        "df_sample_expr__gene_expr": df_sample_expr__gene_expr,
+    }
+
+
+# =========================================================
+# stats helpers
+# =========================================================
+def resolve_genes(X, genes=None):
+    if genes is None:
+        return list(X.index)
+    return list(genes)
+
+
+def safe_mean(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.mean(x) if len(x) > 0 else np.nan
+
+
+def safe_median(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.median(x) if len(x) > 0 else np.nan
+
+
+def safe_sd(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return np.std(x, ddof=1) if len(x) >= 2 else np.nan
+
+
+def safe_cv(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) < 2:
+        return np.nan
+    mu = np.mean(x)
+    sd = np.std(x, ddof=1)
+    return sd / mu if mu > 0 else np.nan
+
+
+def ecdf_values(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) == 0:
+        return np.array([]), np.array([])
+    x = np.sort(x)
+    y = np.arange(1, len(x) + 1) / len(x)
+    return x, y
+
+
+def safe_rank_str(rank_val, n_all):
+    if np.isfinite(rank_val):
+        return f"{int(round(rank_val))}/{n_all}"
+    return "NA"
+
+
+def safe_pct_str(pct_val):
+    if np.isfinite(pct_val):
+        return f"{pct_val:.1f}"
+    return "NA"
+
+
+def format_gene_label(gene):
+    if isinstance(gene, tuple):
+        return " | ".join(str(x) for x in gene)
+    return str(gene)
+
+
+# =========================================================
+# multi-gene summaries and plots
+# =========================================================
+def compute_all_gene_metrics(X):
+    rows = []
+
+    for gene in X.index:
+        raw = pd.to_numeric(X.loc[gene], errors="coerce").to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        pos = raw[raw > 0]
+
+        zero_count = int(np.sum(raw == 0))
+        zero_prop = zero_count / len(raw) if len(raw) > 0 else np.nan
+
+        rows.append({
+            "gene": gene,
+            "zero_count": zero_count,
+            "zero_prop": zero_prop,
+            "mean_all": safe_mean(raw),
+            "median_all": safe_median(raw),
+            "sd_all": safe_sd(raw),
+            "cv_all": safe_cv(raw),
+            "mean_pos": safe_mean(pos),
+            "median_pos": safe_median(pos),
+            "sd_pos": safe_sd(pos),
+            "cv_pos": safe_cv(pos),
+        })
+
+    all_metrics = pd.DataFrame(rows).set_index("gene")
+
+    for metric in ["median_all", "median_pos", "sd_all", "sd_pos", "cv_all", "cv_pos"]:
+        s = all_metrics[metric]
+        all_metrics[f"{metric}_rank"] = s.rank(method="average", ascending=True)
+        all_metrics[f"{metric}_pct"] = s.rank(method="average", pct=True, ascending=True) * 100
+
+    return all_metrics
+
+
+def collect_subset_rows(X, genes, all_metrics):
+    rows = []
+
+    for gene in genes:
+        raw = pd.to_numeric(X.loc[gene], errors="coerce").to_numpy(dtype=float)
+        raw = raw[np.isfinite(raw)]
+        pos = raw[raw > 0]
+
+        rr = {
+            "gene": gene,
+            "vals_all": raw,
+            "vals_pos": pos,
+            "vals_all_log1p": np.log1p(raw),
+            "vals_pos_log1p": np.log1p(pos),
+        }
+        rr.update(all_metrics.loc[[gene]].iloc[0].to_dict())
+        rows.append(rr)
+
+    return rows
+
+
+def plot_boxplots_single_version(
+    rows,
+    value_key,
+    metric_key,
+    xlabel,
+    title,
+    n_all_genes,
+    global_metric_value=None,
+    global_metric_label=None,
+    xlim=None,
+    row_height=0.30,
+    figsize_width=11,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    rows_sorted = sorted(
+        rows,
+        key=lambda r: np.nan_to_num(r.get(metric_key, np.nan), nan=np.inf),
+    )
+
+    n = len(rows_sorted)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(figsize_width, fig_height), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    for ax, row in zip(axes, rows_sorted):
+        vals = row[value_key]
+
+        if len(vals) > 0:
+            ax.boxplot(vals, vert=False, widths=0.6, showfliers=True)
+
+        rank_val = row.get(f"{metric_key}_rank", np.nan)
+        pct_val = row.get(f"{metric_key}_pct", np.nan)
+
+        label = (
+            f"{format_gene_label(row['gene'])}  "
+            f"(zeros={row['zero_count']}, "
+            f"rank={safe_rank_str(rank_val, n_all_genes)}, "
+            f"pct={safe_pct_str(pct_val)})"
+        )
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([label], fontsize=7)
+
+        if global_metric_value is not None and np.isfinite(global_metric_value):
+            ax.axvline(global_metric_value, color="red", linewidth=1.2, alpha=0.9)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+
+        if xlim is not None:
+            ax.set_xlim(*xlim)
+
+    if global_metric_value is not None and np.isfinite(global_metric_value):
+        axes[0].text(
+            global_metric_value,
+            1.35,
+            global_metric_label if global_metric_label else f"global={global_metric_value:.2f}",
+            color="red",
+            fontsize=8,
+            ha="left",
+            va="bottom",
+        )
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    fig.tight_layout()
+
+    return finalize_figure(fig, title, output_dir=output_dir, save=save, show=show, close=close, dpi=dpi, ext=ext)
+
+
+def plot_metric_single(
+    rows,
+    metric_key,
+    xlabel,
+    title,
+    n_all_genes,
+    global_metric_value=None,
+    global_metric_label=None,
+    standardize=False,
+    symmetric=False,
+    row_height=0.30,
+    figsize_width=11,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    vals = np.array([r.get(metric_key, np.nan) for r in rows], dtype=float)
+
+    if standardize:
+        mu = np.nanmean(vals)
+        sd = np.nanstd(vals, ddof=1)
+        vals_plot = (vals - mu) / sd if sd > 0 else np.full_like(vals, np.nan)
+        global_plot = 0.0
+        xlabel = f"{xlabel} (z-score)"
+    else:
+        vals_plot = vals
+        global_plot = global_metric_value
+
+    rows2 = []
+    for r, x in zip(rows, vals_plot):
+        rr = dict(r)
+        rr["_metric_plot"] = x
+        rows2.append(rr)
+
+    rows_sorted = sorted(rows2, key=lambda r: np.nan_to_num(r["_metric_plot"], nan=np.inf))
+
+    n = len(rows_sorted)
+    fig_height = max(8, n * row_height)
+
+    fig, axes = plt.subplots(nrows=n, ncols=1, figsize=(figsize_width, fig_height), sharex=True)
+    if n == 1:
+        axes = [axes]
+
+    finite_vals = np.array([r["_metric_plot"] for r in rows_sorted], dtype=float)
+    finite_vals = finite_vals[np.isfinite(finite_vals)]
+
+    if len(finite_vals) > 0:
+        xmin, xmax = np.min(finite_vals), np.max(finite_vals)
+    else:
+        xmin, xmax = 0, 1
+
+    if symmetric:
+        m = max(abs(xmin), abs(xmax), abs(global_plot) if global_plot is not None else 0)
+        m = m if m > 0 else 1
+        xlim = (-m * 1.05, m * 1.05)
+    else:
+        pad = 0.05 * (xmax - xmin) if xmax > xmin else 1.0
+        xlim = (xmin - pad, xmax + pad)
+
+    for ax, row in zip(axes, rows_sorted):
+        x = row["_metric_plot"]
+
+        if np.isfinite(x):
+            ax.hlines(y=1, xmin=min(0, x), xmax=max(0, x), linewidth=1.4)
+            ax.plot(x, 1, "o", markersize=4)
+
+        rank_val = row.get(f"{metric_key}_rank", np.nan)
+        pct_val = row.get(f"{metric_key}_pct", np.nan)
+
+        label = (
+            f"{format_gene_label(row['gene'])}  "
+            f"(zeros={row['zero_count']}, "
+            f"rank={safe_rank_str(rank_val, n_all_genes)}, "
+            f"pct={safe_pct_str(pct_val)})"
+        )
+
+        ax.set_yticks([1])
+        ax.set_yticklabels([label], fontsize=7)
+
+        if global_plot is not None and np.isfinite(global_plot):
+            ax.axvline(global_plot, color="red", linewidth=1.2, alpha=0.9)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.grid(axis="x", alpha=0.2)
+        ax.set_xlim(*xlim)
+
+    if global_plot is not None and np.isfinite(global_plot):
+        axes[0].text(
+            global_plot,
+            1.35,
+            global_metric_label if global_metric_label else f"global={global_plot:.2f}",
+            color="red",
+            fontsize=8,
+            ha="left",
+            va="bottom",
+        )
+
+    axes[-1].set_xlabel(xlabel)
+    fig.suptitle(title, y=0.999)
+    fig.tight_layout()
+
+    return finalize_figure(fig, title, output_dir=output_dir, save=save, show=show, close=close, dpi=dpi, ext=ext)
+
+
+def plot_ecdf_overlay(
+    rows,
+    value_key,
+    xlabel,
+    title,
+    transform=None,
+    alpha=None,
+    output_dir=None,
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    fig, ax = plt.subplots(figsize=(9, 6))
+
+    n = len(rows)
+    if alpha is None:
+        alpha = min(0.5, max(0.03, 3.0 / max(n, 1)))
+
+    pooled = []
+
+    for row in rows:
+        vals = row[value_key]
+
+        if transform == "zscore":
+            vals = np.asarray(vals, dtype=float)
+            vals = vals[np.isfinite(vals)]
+            if len(vals) >= 2:
+                mu = np.mean(vals)
+                sd = np.std(vals, ddof=1)
+                vals = (vals - mu) / sd if sd > 0 else np.array([])
+            else:
+                vals = np.array([])
+
+        x, y = ecdf_values(vals)
+        if len(x) == 0:
+            continue
+
+        pooled.append(vals)
+        ax.step(x, y, where="post", alpha=alpha, linewidth=1.5, color="steelblue")
+
+    if len(pooled) > 0:
+        pooled_vals = np.concatenate([v for v in pooled if len(v) > 0])
+        if len(pooled_vals) > 0:
+            xg, yg = ecdf_values(pooled_vals)
+            ax.step(xg, yg, where="post", color="black", linewidth=2.5, alpha=1.0, label="pooled selected genes")
+            ax.legend()
+
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("ECDF")
+    ax.set_title(title)
+    ax.grid(alpha=0.2)
+    fig.tight_layout()
+
+    return finalize_figure(fig, title, output_dir=output_dir, save=save, show=show, close=close, dpi=dpi, ext=ext)
+
+
+AVAILABLE_FIGURES = {
+    "expr_all",
+    "expr_pos",
+    "expr_log_all",
+    "expr_log_pos",
+    "sd_all",
+    "sd_pos",
+    "sdz_all",
+    "sdz_pos",
+    "cv_all",
+    "cv_pos",
+    "ecdf_all",
+    "ecdf_pos",
+    "ecdf_z_pos",
+}
+
+
+def plot_selected_genes_suite(
+    X,
+    genes=None,
+    figures=None,
+    output_dir="gene_plots",
+    save=True,
+    show=False,
+    close=True,
+    dpi=150,
+    ext="png",
+):
+    genes = resolve_genes(X, genes)
+    all_metrics = compute_all_gene_metrics(X)
+    rows = collect_subset_rows(X, genes, all_metrics)
+    n_all_genes = len(all_metrics)
+
+    if figures is None:
+        figures = AVAILABLE_FIGURES.copy()
+    else:
+        figures = set(figures)
+
+    unknown = figures - AVAILABLE_FIGURES
+    if unknown:
+        raise ValueError(f"Unknown figure names: {sorted(unknown)}")
+
+    saved_paths = {}
+
+    global_median_all = np.nanmedian(all_metrics["median_all"])
+    global_median_pos = np.nanmedian(all_metrics["median_pos"])
+    global_sd_all = np.nanmedian(all_metrics["sd_all"])
+    global_sd_pos = np.nanmedian(all_metrics["sd_pos"])
+    global_cv_all = np.nanmedian(all_metrics["cv_all"])
+    global_cv_pos = np.nanmedian(all_metrics["cv_pos"])
+
+    xmax_all = np.nanmax([np.nanmax(r["vals_all"]) if len(r["vals_all"]) > 0 else np.nan for r in rows])
+    xmax_pos = np.nanmax([np.nanmax(r["vals_pos"]) if len(r["vals_pos"]) > 0 else np.nan for r in rows])
+    xmax_all_log = np.nanmax([np.nanmax(r["vals_all_log1p"]) if len(r["vals_all_log1p"]) > 0 else np.nan for r in rows])
+    xmax_pos_log = np.nanmax([np.nanmax(r["vals_pos_log1p"]) if len(r["vals_pos_log1p"]) > 0 else np.nan for r in rows])
+
+    if "expr_all" in figures:
+        saved_paths["expr_all"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_all",
+            metric_key="median_all",
+            xlabel="RSEM UQ expression",
+            title="Per-gene expression distributions across samples (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_median_all,
+            global_metric_label=f"all-gene median(median_all) = {global_median_all:.2f}",
+            xlim=(0, xmax_all),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "expr_pos" in figures:
+        saved_paths["expr_pos"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_pos",
+            metric_key="median_pos",
+            xlabel="RSEM UQ expression (>0 only)",
+            title="Per-gene expression distributions across samples (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_median_pos,
+            global_metric_label=f"all-gene median(median_pos) = {global_median_pos:.2f}",
+            xlim=(0, xmax_pos),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "expr_log_all" in figures:
+        saved_paths["expr_log_all"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_all_log1p",
+            metric_key="median_all",
+            xlabel="log(1 + RSEM UQ expression)",
+            title="Per-gene expression distributions across samples (log1p, zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=np.log1p(global_median_all),
+            global_metric_label=f"log1p(all-gene median(median_all)) = {np.log1p(global_median_all):.2f}",
+            xlim=(0, xmax_all_log),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "expr_log_pos" in figures:
+        saved_paths["expr_log_pos"] = plot_boxplots_single_version(
+            rows=rows,
+            value_key="vals_pos_log1p",
+            metric_key="median_pos",
+            xlabel="log(1 + RSEM UQ expression, >0 only)",
+            title="Per-gene expression distributions across samples (log1p, zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=np.log1p(global_median_pos),
+            global_metric_label=f"log1p(all-gene median(median_pos)) = {np.log1p(global_median_pos):.2f}",
+            xlim=(0, xmax_pos_log),
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sd_all" in figures:
+        saved_paths["sd_all"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_all",
+            xlabel="Standard deviation across samples",
+            title="Per-gene standard deviation (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_all,
+            global_metric_label=f"all-gene median(sd_all) = {global_sd_all:.2f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sd_pos" in figures:
+        saved_paths["sd_pos"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_pos",
+            xlabel="Standard deviation across samples (>0 only)",
+            title="Per-gene standard deviation (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_pos,
+            global_metric_label=f"all-gene median(sd_pos) = {global_sd_pos:.2f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sdz_all" in figures:
+        saved_paths["sdz_all"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_all",
+            xlabel="Standard deviation across samples",
+            title="Per-gene standard deviation z-score (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_all,
+            global_metric_label="global z = 0",
+            standardize=True,
+            symmetric=True,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "sdz_pos" in figures:
+        saved_paths["sdz_pos"] = plot_metric_single(
+            rows=rows,
+            metric_key="sd_pos",
+            xlabel="Standard deviation across samples (>0 only)",
+            title="Per-gene standard deviation z-score (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_sd_pos,
+            global_metric_label="global z = 0",
+            standardize=True,
+            symmetric=True,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "cv_all" in figures:
+        saved_paths["cv_all"] = plot_metric_single(
+            rows=rows,
+            metric_key="cv_all",
+            xlabel="Coefficient of variation",
+            title="Per-gene coefficient of variation (zeros retained)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_cv_all,
+            global_metric_label=f"all-gene median(cv_all) = {global_cv_all:.3f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "cv_pos" in figures:
+        saved_paths["cv_pos"] = plot_metric_single(
+            rows=rows,
+            metric_key="cv_pos",
+            xlabel="Coefficient of variation (>0 only)",
+            title="Per-gene coefficient of variation (zeros removed)",
+            n_all_genes=n_all_genes,
+            global_metric_value=global_cv_pos,
+            global_metric_label=f"all-gene median(cv_pos) = {global_cv_pos:.3f}",
+            standardize=False,
+            symmetric=False,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "ecdf_all" in figures:
+        saved_paths["ecdf_all"] = plot_ecdf_overlay(
+            rows=rows,
+            value_key="vals_all",
+            xlabel="RSEM UQ expression",
+            title="ECDF overlay (zeros retained)",
+            transform=None,
+            alpha=0.08,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "ecdf_pos" in figures:
+        saved_paths["ecdf_pos"] = plot_ecdf_overlay(
+            rows=rows,
+            value_key="vals_pos",
+            xlabel="RSEM UQ expression (>0 only)",
+            title="ECDF overlay (zeros removed)",
+            transform=None,
+            alpha=0.08,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    if "ecdf_z_pos" in figures:
+        saved_paths["ecdf_z_pos"] = plot_ecdf_overlay(
+            rows=rows,
+            value_key="vals_pos",
+            xlabel="Per-gene standardized expression (>0 only)",
+            title="ECDF overlay (zeros removed, within-gene z-score)",
+            transform="zscore",
+            alpha=0.10,
+            output_dir=output_dir,
+            save=save,
+            show=show,
+            close=close,
+            dpi=dpi,
+            ext=ext,
+        )
+
+    return rows, all_metrics, saved_paths
+
+
+# =========================================================
+# single-gene plot
+# =========================================================
+def plot_single_gene_boxplot(
+    df_mrna_seq,
+    gene,
+    set_index_fn=None,
+    transform=None,
+    remove_zeros=True,
+    title="Gene Expression",
+    subtitle="The distribution of mRNA-seq data across tumour samples",
+    xlabel=None,
+    figsize=(10, 2.8),
+    title_fs=18,
+    subtitle_fs=12,
+    axis_label_fs=14,
+    tick_fs=12,
+    tick_grey="#B0B0B0",
+    grid_grey="#D0D0D0",
+    box_facecolor="#4C78A8",
+    box_edgecolor="#2F2F2F",
+    median_color="#111111",
+    whisker_color="#4A4A4A",
+    box_width=0.55,
+    box_linewidth=1.2,
+    median_linewidth=1.8,
+    whisker_linewidth=0.9,
+    outlier_size=4.2,
+    outlier_face_rgba=(0.35, 0.35, 0.35, 0.45),
+    outlier_edge_rgba=(0.35, 0.35, 0.35, 0.65),
+    outlier_edgewidth=0.5,
+    top=0.62,
+    left=0.14,
+    bottom=0.28,
+    show_summary=False,
+    return_data=False,
+):
+    """
+    Plot a single horizontal boxplot for one gene across samples.
+    """
+    df = df_mrna_seq.copy()
+    if set_index_fn is not None:
+        df = set_index_fn(df)
+
+    if isinstance(df.index, pd.MultiIndex):
+        if isinstance(gene, tuple):
+            df_gene = df.loc[[gene]]
+            gene_label = str(gene[1]) if len(gene) > 1 else str(gene)
+        else:
+            level_names = list(df.index.names)
+            if "Hugo_Symbol" in level_names:
+                hugo_level = level_names.index("Hugo_Symbol")
+                mask = df.index.get_level_values(hugo_level) == gene
+                df_gene = df.loc[mask]
+                gene_label = str(gene)
+            else:
+                raise ValueError(
+                    "MultiIndex detected but no 'Hugo_Symbol' level found. "
+                    "Pass a full tuple index value for `gene`."
+                )
+    else:
+        df_gene = df.loc[[gene]]
+        gene_label = str(gene)
+
+    if df_gene.shape[0] == 0:
+        raise ValueError(f"No rows matched gene={gene!r}")
+
+    raw = pd.to_numeric(df_gene.to_numpy().ravel(), errors="coerce")
+    raw = raw[np.isfinite(raw)]
+
+    if remove_zeros:
+        vals = raw[raw > 0]
+    else:
+        vals = raw.copy()
+
+    if len(vals) == 0:
+        raise ValueError("No values left after filtering.")
+
+    if transform is None:
+        vals_plot = vals
+        if xlabel is None:
+            xlabel = "Gene Expression (RSEM UQ Normalized)"
+    elif transform == "log1p":
+        vals_plot = np.log1p(vals)
+        if xlabel is None:
+            xlabel = "Gene Expression (log(1 + RSEM UQ Normalized))"
+    else:
+        raise ValueError("transform must be one of: None, 'log1p'")
+
+    summary = {
+        "gene": gene,
+        "gene_label": gene_label,
+        "n_total": len(raw),
+        "n_used": len(vals),
+        "zero_count": int(np.sum(raw == 0)),
+        "min": float(np.min(vals)),
+        "q10": float(np.percentile(vals, 10)),
+        "q25": float(np.percentile(vals, 25)),
+        "median": float(np.median(vals)),
+        "q75": float(np.percentile(vals, 75)),
+        "q90": float(np.percentile(vals, 90)),
+        "max": float(np.max(vals)),
+    }
+
+    if show_summary:
+        for k, v in summary.items():
+            print(f"{k}: {v}")
+
+    fig, ax = plt.subplots(figsize=figsize)
+    fig.subplots_adjust(top=top, left=left, bottom=bottom)
+
+    fig.text(left, 0.97, title, ha="left", va="top", fontsize=title_fs, fontweight="bold")
+    fig.text(left, 0.89, subtitle, ha="left", va="top", fontsize=subtitle_fs)
+
+    ax.boxplot(
+        vals_plot,
+        vert=False,
+        widths=box_width,
+        showfliers=True,
+        patch_artist=True,
+        boxprops=dict(facecolor=box_facecolor, edgecolor=box_edgecolor, linewidth=box_linewidth),
+        medianprops=dict(color=median_color, linewidth=median_linewidth),
+        whiskerprops=dict(color=whisker_color, linewidth=whisker_linewidth),
+        capprops=dict(color=whisker_color, linewidth=whisker_linewidth),
+        flierprops=dict(
+            marker="o",
+            markersize=outlier_size,
+            markerfacecolor=outlier_face_rgba,
+            markeredgecolor=outlier_edge_rgba,
+            markeredgewidth=outlier_edgewidth,
+            linestyle="none",
+        ),
+    )
+
+    ax.set_xlabel(xlabel, fontsize=axis_label_fs, labelpad=14)
+    ax.set_yticks([1])
+    ax.set_yticklabels([gene_label], fontsize=tick_fs)
+    ax.tick_params(axis="x", labelsize=tick_fs, colors=tick_grey)
+    ax.tick_params(axis="y", labelsize=tick_fs, length=0)
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    ax.grid(axis="x", color=grid_grey, alpha=0.5)
+
+    if return_data:
+        return fig, ax, vals_plot, summary
+    return fig, ax
+
+```
+
+### Environment
+
+Checks
+
+```{python}
+#| label: analyze-setup-environment
+#| eval: false
+#| display: false
+#| output: false
+
+# ---------- helpers ----------
+
+def _run(cmd: list[str]) -> tuple[int, str, str]:
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    return p.returncode, p.stdout, p.stderr
+
+def _canonical(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower().strip()
+
+def read_environment_yml(path: str | Path = "environment.yml"):
+    """
+    Parse environment.yml into:
+      - conda_chosen: conda deps declared in environment.yml (name -> version/constraint/None)
+      - pip_chosen: pip deps declared under `- pip:` in environment.yml (name -> version/constraint/None)
+    Notes:
+      - Handles conda pins like `name`, `name=ver`, `name=ver=build`
+      - Handles constraints like `python>=3.11`, `numpy<2`
+      - Normalizes accidental leading '=' in version strings (e.g., '=1.2.3')
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    conda_chosen: dict[str, str | None] = {}
+    pip_chosen: dict[str, str | None] = {}
+
+    deps = data.get("dependencies", []) or []
+    for dep in deps:
+        if isinstance(dep, str):
+            s = dep.strip()
+            if not s:
+                continue
+
+            # constraint case: python>=3.11, numpy<2, etc.
+            m = re.match(r"^([A-Za-z0-9_.-]+)\s*([<>=!~].+)$", s)
+            if m:
+                conda_chosen[_canonical(m.group(1))] = m.group(2).strip()
+                continue
+
+            # conda pins can be: name, name=ver, name=ver=build
+            parts = s.split("=")
+            name = _canonical(parts[0])
+            ver = parts[1] if len(parts) >= 2 else None
+            if ver is not None:
+                ver = ver.strip()
+                if ver.startswith("=") and not ver.startswith("=="):
+                    ver = ver.lstrip("=")
+            conda_chosen[name] = ver
+
+        elif isinstance(dep, dict) and "pip" in dep:
+            for p in dep.get("pip", []) or []:
+                ps = str(p).strip()
+                if not ps:
+                    continue
+                if "==" in ps:
+                    pkg, ver = ps.split("==", 1)
+                    pip_chosen[_canonical(pkg)] = ver.strip()
+                else:
+                    # store non-exact constraint as-is (>=, <=, ~=, etc.)
+                    pkg = re.split(r"[<>=!~]", ps, maxsplit=1)[0].strip()
+                    constraint = ps[len(pkg):].strip() or None
+                    pip_chosen[_canonical(pkg)] = constraint
+
+    return data, conda_chosen, pip_chosen
+
+
+def _conda_cmd() -> list[str] | None:
+    """
+    Find conda.exe even when it's not on PATH (common for notebooks on Windows).
+
+    Priority:
+      1) CONDA_EXE env var (if set)
+      2) PATH lookup (shutil.which("conda"))
+      3) Derive from CONDA_PREFIX (Windows Anaconda layout):
+         CONDA_PREFIX = ...\\anaconda3\\envs\\<env>
+         conda.exe    = ...\\anaconda3\\Scripts\\conda.exe
+    """
+    # 1) explicit env var (often not set in notebooks)
+    conda_exe = os.getenv("CONDA_EXE")
+    if conda_exe and Path(conda_exe).exists():
+        return [conda_exe]
+
+    # 2) PATH lookup
+    which = shutil.which("conda")
+    if which:
+        return [which]
+
+    # 3) derive from CONDA_PREFIX on Windows
+    conda_prefix = os.getenv("CONDA_PREFIX")
+    if conda_prefix:
+        p = Path(conda_prefix)
+        # Typical: .../anaconda3/envs/<env> -> base is parent of "envs"
+        if p.parent.name.lower() == "envs":
+            base = p.parents[1]
+        else:
+            # Sometimes CONDA_PREFIX might be the base env itself
+            base = p
+        candidate = base / "Scripts" / "conda.exe"
+        if candidate.exists():
+            return [str(candidate)]
+
+    return None
+
+
+def conda_available() -> bool:
+    cmd = _conda_cmd()
+    if not cmd:
+        return False
+    try:
+        subprocess.run(cmd + ["--version"], capture_output=True, text=True, check=True)
+        return True
+    except Exception:
+        return False
+
+
+def get_conda_installed_versions_strict() -> dict[str, str]:
+    cmd = _conda_cmd()
+    if not cmd:
+        raise FileNotFoundError("Could not find conda executable...")
+
+    prefix = os.getenv("CONDA_PREFIX")
+    if not prefix:
+        raise RuntimeError("CONDA_PREFIX is not set; cannot target env.")
+
+    proc = subprocess.run(
+        cmd + ["list", "--json", "--prefix", prefix],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"conda list failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}")
+
+    items = json.loads(proc.stdout)
+    out = {}
+    for it in items:
+        name = (it.get("name") or "").strip().lower()
+        ver = (it.get("version") or "").strip()
+        if name and ver:
+            out[name] = ver
+
+    out["python"] = sys.version.split()[0]
+    return out
+
+def get_conda_chosen_from_history() -> dict[str, str | None]:
+    """
+    Packages explicitly requested in this env (best proxy):
+    `conda env export --from-history [--prefix ...]`
+
+    Returns: canonical_name -> constraint/pin/None
+      - Handles pins:   name, name=1.2.3, name=1.2.3=build
+      - Handles constraints: name<2, name>=3.11, name ~=1.4, etc.
+    """
+    cmd = _conda_cmd()
+    if not cmd:
+        return {}
+
+    # Prefer CONDA_PREFIX if available; otherwise fall back to interpreter prefix
+    prefix = os.getenv("CONDA_PREFIX") or str(Path(sys.executable).resolve().parent.parent)
+
+    proc = subprocess.run(
+        cmd + ["env", "export", "--from-history", "--prefix", prefix],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        # If conda isn't available in this context, just return empty (don't blow up rendering)
+        return {}
+
+    data = yaml.safe_load(proc.stdout) or {}
+    deps = data.get("dependencies", []) or []
+
+    chosen: dict[str, str | None] = {}
+
+    for dep in deps:
+        if not isinstance(dep, str):
+            continue
+        s = dep.strip()
+        if not s:
+            continue
+
+        # constraint case: python>=3.11, setuptools<80, numpy!=2.0, etc.
+        m = re.match(r"^([A-Za-z0-9_.-]+)\s*([<>=!~].+)$", s)
+        if m:
+            chosen[_canonical(m.group(1))] = m.group(2).strip()
+            continue
+
+        # pin case: name, name=ver, name=ver=build
+        parts = s.split("=")
+        name = _canonical(parts[0])
+        ver = parts[1].strip().lstrip("=") if len(parts) >= 2 else None
+        chosen[name] = ver
+
+    return chosen
+
+
+
+def get_pip_installed_all() -> dict[str, str]:
+    """
+    pip list as json; best effort even inside conda env.
+    """
+    rc, out, err = _run([sys.executable, "-m", "pip", "list", "--format=json"])
+    if rc != 0:
+        return {}
+    items = json.loads(out)
+    return {_canonical(it["name"]): it["version"] for it in items}
+
+
+def version_status(expected: str | None, installed: str | None) -> str:
+    if installed is None:
+        return "MISSING"
+    if expected is None:
+        return "OK (un-pinned)"
+
+    expected = expected.strip()
+
+    # Treat "=1.2.3" as an exact pin (common accidental format)
+    if expected.startswith("=") and not expected.startswith("=="):
+        expected = expected.lstrip("=")
+
+    # True constraints (>=, <=, ==, ~=, etc.)
+    if expected and expected[0] in "<>!~" or expected.startswith("=="):
+        return "CHECK (constraint)"
+
+    if expected.endswith(".*"):
+        return "OK" if installed.startswith(expected[:-1]) else "MISMATCH"
+
+    return "OK" if installed == expected else "MISMATCH"
+
+
+
+# ---------- run ----------
+
+env_data, yml_conda_chosen, yml_pip_chosen = read_environment_yml("environment.yml")
+
+# Capture interpreter details (your "custom interpreter" concern)
+interpreter_rows = [
+    {"Key": "sys.executable", "Value": sys.executable},
+    {"Key": "sys.version", "Value": sys.version},
+]
+if os.getenv("CONDA_PREFIX"):
+    interpreter_rows.append({"Key": "CONDA_PREFIX", "Value": os.getenv("CONDA_PREFIX")})
+df_interpreter = pd.DataFrame(interpreter_rows)
+display(df_interpreter)
+
+# Get actuals
+try:
+    conda_installed = get_conda_installed_versions_strict() if conda_available() else {}
+except Exception as e:
+    print("⚠️ Could not read conda installed packages:", e)
+    conda_installed = {}
+
+conda_history_chosen = get_conda_chosen_from_history() if conda_available() else {}
+pip_installed = get_pip_installed_all()
+
+rows: list[dict] = []
+
+def add_manager_rows(
+    manager: str,
+    chosen_map: dict[str, str | None],
+    installed_versions: dict[str, str],
+):
+    chosen_set = set(chosen_map.keys())
+
+    # chosen packages (source of truth = environment.yml)
+    for pkg in sorted(chosen_map.keys()):
+        exp = chosen_map[pkg]
+        got = installed_versions.get(pkg)
+        status = version_status(exp, got)
+        rows.append({
+            "Manager": manager,
+            "Package": pkg,
+            "Chosen?": True,
+            "Expected (environment.yml)": exp if exp is not None else "(un-pinned)",
+            "Installed": got if got is not None else "(not installed)",
+            "Status": status,
+        })
+
+    # dependencies (installed but not chosen)
+    for pkg in sorted(set(installed_versions.keys()) - chosen_set):
+        got = installed_versions.get(pkg)
+        rows.append({
+            "Manager": manager,
+            "Package": pkg,
+            "Chosen?": False,
+            "Expected (environment.yml)": "(dependency)",
+            "Installed": got,
+            "Status": "INFO (dependency)",
+        })
+
+# Conda & Pip rows
+add_manager_rows("conda", yml_conda_chosen, conda_installed)
+add_manager_rows("pip", yml_pip_chosen, pip_installed)
+
+df = pd.DataFrame(rows)
+
+# Helpful sorting: chosen first, then manager, then package
+df = df.sort_values(by=["Chosen?", "Manager", "Package"], ascending=[False, True, True]).reset_index(drop=True)
+display(df)
+
+# Summary counts for quick signal
+summary = df.groupby(["Manager", "Status"]).size().reset_index(name="Count")
+display(summary)
+
+# Extra: show "explicit conda-history packages missing from environment.yml"
+extra_explicit = []
+if conda_history_chosen:
+    for pkg in sorted(set(conda_history_chosen.keys()) - set(yml_conda_chosen.keys())):
+        extra_explicit.append({
+            "Package": pkg,
+            "From conda history": conda_history_chosen[pkg],
+            "In environment.yml?": "NO",
+        })
+
+df_extra_explicit = pd.DataFrame(extra_explicit)
+if not df_extra_explicit.empty:
+    print("⚠️ Packages explicitly requested in this conda env (history) but missing from environment.yml:")
+    display(df_extra_explicit)
+else:
+    print("✅ No extra explicit conda-history packages missing from environment.yml (or conda history unavailable).")
+
+
+```
+
+## Data Acquisition
+
+```{ojs}
+//| label: section-div-02
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div class="current">Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+We use the cBioPortal to gather data about what is available. 
+
+### cBioPortal
+
+#### Cancer Types
+```{python}
+#| label: analyze-data-acquisition-cancer-types-api
+#| eval: true
+#| display: true
+#| column: screen-inset
+
+# Cancer Types API
+cancer_types_api_config = cbioportal.Configuration()
+cancer_types_api_instance = cbioportal.CancerTypesApi(cbioportal.ApiClient(cancer_types_api_config))
+
+cbioportal_cancer_types = cancer_types_api_instance.get_all_cancer_types_using_get()
+cbioportal_cancer_types = pd.DataFrame([item.to_dict() for item in cbioportal_cancer_types])
+
+itables.show(
+    cbioportal_cancer_types
+)
+
+```
+
+:::{.column-screen-inset}
+<iframe 
+    src="https://oncotree.mskcc.org/?version=oncotree_latest_stable&field=CODE&search=LGG" 
+    width="100%" 
+    height="800px" 
+    style="border:none;">
+</iframe>
+:::
+
+#### Studies
+```{python}
+#| label: analyze-data-acquisition-studies-api
+#| eval: true
+#| display: true
+#| column: screen-inset
+
+# Studies API
+studies_api_instance = cbioportal.StudiesApi()
+
+cbioportal_studies = studies_api_instance.get_all_studies_using_get()
+cbioportal_studies = pd.DataFrame([item.to_dict() for item in cbioportal_studies])
+
+itables.show(
+    cbioportal_studies,
+    maxBytes=0
+)
+```
+
+#### Clinical Attributes
+```{python}
+#| label: analyze-data-acquisition-clinical-attributes-api
+#| eval: true
+#| display: true
+#| column: screen-inset
+
+# Clinical Attributes API
+
+lgg_clinical_attributes = cbioportal.ClinicalAttributesApi().get_all_clinical_attributes_in_study_using_get('lgg_tcga_pan_can_atlas_2018')
+lgg_clinical_attributes = pd.DataFrame([item.to_dict() for item in lgg_clinical_attributes])
+
+itables.show(
+    lgg_clinical_attributes
+)
+
+```
+
+### Download and Extract
+
+The Brain Lower Grade Glioma (TCGA, PanCancer Atlas) dataset was obtained from the cBioPortal for Cancer Genomics. The dataset was downloaded as a compressed tarball containing clinical, molecular, and metadata files.
+
+**Dataset**: Brain Lower Grade Glioma (TCGA, PanCancer Atlas)  
+**Source**: https://www.cbioportal.org/  
+**File**: `lgg_tcga_pan_can_atlas_2018.tar.gz`
+
+```{python}
+#| label: analyze-data-acquisition-extract-package
+#| eval: true
+#| display: true
+
+study_paths = download_and_extract_studies(
+    "lgg_tcga_pan_can_atlas_2018",
+    "lgg_ucsf_2014"
+)
+study_paths
+
+```
+
+::: callout-note
+## cBioPortal Downloading
+
+There is extensive documentation for how to download from cBioPortal. This includes manually through the browser, or with an API. https://docs.cbioportal.org/downloads/
+
+:::
+
+### Data Loading
+
+Using information from the cBioPortal Summary tab and the downloaded data files, the following provides a high-level overview of the dataset, including patient counts, molecular data availability, mutation frequencies, and survival information.
+
+```{python}
+#| label: analyze-data-acquisition-loading-helper
+#| eval: true
+#| display: false
+
+
+
+def describe_dataframe_table(df: pd.DataFrame) -> pd.DataFrame:
+    rows = []
+
+    for col in df.columns:
+        s = df[col]
+
+        row = {
+            "Column Name": col,
+            "Column Type": str(s.dtype),
+            "Non-Null Count": s.notna().sum(),
+            "Missing Count": s.isna().sum(),
+        }
+
+        if pd.api.types.is_numeric_dtype(s):
+            row.update({
+                "Data Kind": "Numeric",
+                "Min": s.min(),
+                "Max": s.max(),
+                "Categories": None,
+            })
+        else:
+            row.update({
+                "Data Kind": "Categorical",
+                "Min": None,
+                "Max": None,
+                "Categories": ", ".join(map(str, s.dropna().unique()[:10])),
+            })
+
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+```
+
+:::: column-page
+::: panel-tabset
+## Patient
+
+```{python}
+#| label: analyze-data-acquisition-loading-patient
+#| eval: true
+#| display: true
+
+
+clinical_patient_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_patient.txt")
+df_clinical_patients = pd.read_csv(clinical_patient_file, sep="\t", comment="#")
+itables.show(
+    df_clinical_patients,
+    maxBytes=0
+)
+
+described_df_clinical_patients = describe_dataframe_table(df_clinical_patients)
+itables.show(
+    described_df_clinical_patients,
+    paging=False,
+    text_in_header_can_be_selected=False,
+    columnControl=["order", "colVisDropdown", "searchDropdown"],
+    ordering={"indicators": False, "handler": False}
+)
+
+```
+
+## Clinical Sample
+
+```{python}
+#| label: analyze-data-acquisition-loading-clinical-sample
+#| eval: true
+#| display: true
+
+
+clinical_sample_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_clinical_sample.txt")
+df_clinical_samples = pd.read_csv(clinical_sample_file, sep="\t", comment="#")
+itables.show(
+    df_clinical_samples,
+    maxBytes=0
+)
+
+described_df_clinical_samples = describe_dataframe_table(df_clinical_samples)
+itables.show(described_df_clinical_samples)
+
+```
+
+## MRNA Seq
+
+```{python}
+#| label: analyze-data-acquisition-loading-mrna
+#| eval: true
+#| display: true
+
+mrna_seq_file = Path("data/external/extracted/lgg_tcga_pan_can_atlas_2018/data_mrna_seq_v2_rsem.txt")
+df_mrna_seq = pd.read_csv(mrna_seq_file, sep="\t", comment="#")
+itables.show(
+    df_mrna_seq,
+)
+
+described_df_mrna_seq = describe_dataframe_table(df_mrna_seq)
+itables.show(described_df_mrna_seq)
+
+# expr = df.iloc[:, 2:]
+
+# gene_summary = pd.DataFrame({
+#     "mean": expr.mean(axis=1),
+#     "median": expr.median(axis=1),
+#     "std": expr.std(axis=1),
+#     "variance": expr.var(axis=1),
+#     "nonzero_fraction": (expr > 0).mean(axis=1)
+# })
+
+# gene_summary.head()
+
+
+
+
+
+
+
+```
+
+:::
+::::
+
+```{dot}
+//| label: fig-dataModel
+//| fig-cap: cBioPortal Data Model
+//| file: dataModel.dot
+```
+
+## Data Understanding
+
+```{ojs}
+//| label: section-div-03
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div class="current">Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Exploratory Analysis</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Validation</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+### Review
+1. Cancer is a disease of altered cellular behaviour
+2. Cellular behaviour is driven by proteins
+3. Proteins are made from mRNA
+4. mRNA reflects gene activity and strength
+
+Therefore, measuring mRNA gives us a quantitative snapshot of cellular behaviour.
+
+### RNA Sequencing
+Goal: From a tissue sample of a tumor, find out which genes are being expressed and how much
+
+1. Prepare a sequence library
+2. Sequence
+3. Prepare data
+
+#### Part 1: Prepare a sequence library
+
+Input: Tissue Sample
+
+```{dot}
+//| label: fig-rnaSeq_01_prepLibrary
+//| fig-cap: RNA Sequencing Part 1 Prepare a sequence library
+//| file: rnaSeq_01_prepLibrary.dot
+```
+
+Output: cDNA Fragments
+
+#### Part 2: Sequence
+
+Input: cDNA Fragments
+
+1. Put fragment on Flow cell
+2. Probe each nucleotide
+3. Repeated until the entire fragment is probed
+
+Output: FAST file, which has the sequence of bases for each fragment and a quality score per base
+
+#### Part 3: Prepare Data
+
+Input: FAST file
+
+1. Align the high quality reads to a transcript / gene (probabilistic)
+
+Output: Counts of fragments to transcripts
+
+
+### WHAT DOES THIS NUMBER TELL US? 
+
+Each number represents a gene's relative expression level. We can compare both across the samples, and across genes. 
+
+
+## Upper Quartile (UQ) Normalization — Inspection
+
+Upper Quartile normalization rescales each sample so that the **75th percentile of expression values is aligned across samples**.
+
+If the data are already UQ-normalized, we expect:
+
+- The 75th percentile values to be very similar across samples.
+- Expression distributions to be roughly aligned (on a log scale).
+- Low variability in the per-sample UQ values.
+
+### Compute the Upper Quartile per Sample
+
+```{python}
+# --- Build a numeric matrix X with samples in columns ---
+df = df_mrna_seq.copy()
+
+# Use Hugo_Symbol as index if present; otherwise keep default index.
+if "Hugo_Symbol" in df.columns:
+    df = df.set_index("Hugo_Symbol")
+
+if "Entrez_Gene_Id" in df.columns:
+    df = df.drop(columns=["Entrez_Gene_Id"])
+
+# If you have other non-sample identifier columns, drop them here as needed.
+# Example:
+# for col in ["Entrez_Gene_Id", "Entrez_Gene_ID", "Entrez_Gene_id", "Entrez_GeneID"]:
+#     if col in df.columns:
+#         df = df.drop(columns=[col])
+
+# Coerce to numeric; non-numeric entries become NaN
+X = df.apply(pd.to_numeric, errors="coerce")
+
+def uq_nonzero(col: pd.Series) -> float:
+    """75th percentile excluding zeros and NaNs. Returns NaN if empty."""
+    v = col.dropna()
+    v = v[v > 0]
+    if len(v) == 0:
+        return np.nan
+    return float(np.quantile(v, 0.75))
+
+uq = X.apply(uq_nonzero, axis=0)
+uq
+```
+
+### Distribution of UQ Across Samples
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq.dropna().values, bins=40)
+plt.title("Per-sample Upper Quartile (75th percentile)")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+#### Interpretation
+If the data are properly UQ-normalized:
+- The histogram should be tightly concentrated
+- Large spread would indicate remaining library-size differences
+
+### Sorted UQ Values
+
+```{python}
+uq_sorted = np.sort(uq.dropna().values)
+
+plt.figure(figsize=(6,4))
+plt.plot(uq_sorted)
+plt.title("Sorted Per-sample UQ Values")
+plt.xlabel("Samples (sorted)")
+plt.ylabel("UQ value")
+plt.ylim(0, 1250)
+plt.tight_layout()
+plt.show()
+```
+
+#### Interpretation
+- A nearly flat line indicated consistent normalization
+- A steep slope suggests uneven scaling across samples
+
+### Expression Distribution Comparison (log scale)
+We compare a subset of samples to inspect distribution alignment
+
+```{python}
+sample_cols = list(X.columns[:8])  # change 8 to any small number you want
+
+plt.figure(figsize=(8,5))
+for col in sample_cols:
+    v = X[col].dropna()
+    v = v[v > 0]
+    if len(v) == 0:
+        continue
+    plt.hist(np.log10(v), bins=60, alpha=0.3)
+
+plt.title("Log10(Expression) Distributions (Selected Samples)")
+plt.xlabel("log10(expression)")
+plt.ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+#### Interpretation
+After UQ normalization
+- Distributions should overlap substantially
+- Major horizontal shifts would suggest remaining depth differences
+- Perfect overlap is not expected (i.e., biological variation remains)
+
+### Coefficient of Variation of UQ
+
+```{python}
+uq_clean = uq.dropna()
+cv = uq_clean.std() / uq_clean.mean()
+cv
+```
+
+The coefficient of variation summarized how tightly aligned the UQ values are
+- Small: strong normalization consistency
+- Large: residual scaling differences
+
+
+
+Overall UQ normalization: 
+- Corrects multiplicative library-size effects
+- Anchors the 75th percentile expression level
+- Assumes most genes are not dramatically differntially expressed
+- Does not remove biological variation
+
+
+
+
+
+
+## Data Cleaning
+
+```{ojs}
+//| label: section-div-04
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div class="current">Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+cBioPortal already does some cleaning for us, and we need to understand what the baseline state of their data is (which we investigated during previous sections). 
+
+### cBioPortal Pre-Processing Standards
+- File formats are explained: https://docs.cbioportal.org/file-formats/
+- The dataset validator script is explained: https://docs.cbioportal.org/using-the-dataset-validator/
+- Data is explained with metadata, which has a schema: https://raw.githubusercontent.com/cBioPortal/cbioportal-core/main/scripts/importer/cbioportal_common.py
+
+There are some gaps with the pre-processing standards, that we will identify and deal with. 
+
+Highlighting some of the key pieces:
+
+### Our Analysis Contract
+- Clinical (i.e., Pateient, Sample)
+  - Every SAMPLE_ID in data_clinical_sample.txt must map to a PATIENT_ID (and that patient exists in data_clinical_patient.txt, if being used)
+  - SAMPLE_ID unique
+  - PATIENT_ID unique
+  - NUMBER datatypes
+  - BOOLEAN datatypes
+  - Age columns non-negative
+
+```{python}
+clinical_attributes_mskcc = pd.read_json("getClinicalAttributeMetadata-mskcc.json")
+clinical_attributes_mskcc
+```
+
+```{python}
+#| echo: true
+#| eval: false
+#| code-line-numbers: true
+#| filename: "https://raw.githubusercontent.com/cBioPortal/cbioportal-core/main/scripts/importer/cbioportal_common.py"
+
+#!/usr/bin/env python3
+
+# ------------------------------------------------------------------------------
+# Common components used by various cbioportal scripts.
+# ------------------------------------------------------------------------------
+
+
+import os
+import sys
+import csv
+import logging.handlers
+from collections import OrderedDict
+from subprocess import Popen, PIPE, STDOUT
+from typing import Dict, Optional
+import dsnparse
+import pymysql
+pymysql.install_as_MySQLdb()
+
+# MySQLdb import should come after the install_as_MySQLdb() line above
+import MySQLdb
+
+
+# ------------------------------------------------------------------------------
+# globals
+
+ERROR_FILE = sys.stderr
+OUTPUT_FILE = sys.stdout
+
+# global variables to check `source_stable_id` for `genomic_profile_link`
+expression_stable_ids = {}
+gsva_scores_stable_id = ""
+expression_zscores_source_stable_ids = {}
+gsva_scores_source_stable_id = ""
+gsva_pvalues_source_stable_id = ""
+expression_zscores_filename = ""
+gsva_scores_filename = ""
+gsva_pvalues_filename = ""
+
+IMPORT_STUDY_CLASS = "org.mskcc.cbio.portal.scripts.ImportCancerStudy"
+UPDATE_STUDY_STATUS_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCancerStudy"
+REMOVE_STUDY_CLASS = "org.mskcc.cbio.portal.scripts.RemoveCancerStudy"
+REMOVE_SAMPLES_CLASS = "org.mskcc.cbio.portal.scripts.RemoveSamples"
+REMOVE_PATIENTS_CLASS = "org.mskcc.cbio.portal.scripts.RemovePatients"
+IMPORT_CANCER_TYPE_CLASS = "org.mskcc.cbio.portal.scripts.ImportTypesOfCancers"
+IMPORT_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.ImportSampleList"
+ADD_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.AddCaseList"
+UPDATE_CASE_LIST_CLASS = "org.mskcc.cbio.portal.scripts.UpdateCaseListsSampleIds"
+VERSION_UTIL_CLASS = "org.mskcc.cbio.portal.util.VersionUtil"
+
+PORTAL_PROPERTY_DATABASE_USER = 'db.user'
+PORTAL_PROPERTY_DATABASE_PW = 'db.password'
+PORTAL_PROPERTY_DATABASE_HOST = 'db.host'
+PORTAL_PROPERTY_DATABASE_NAME = 'db.portal_db_name'
+PORTAL_PROPERTY_DATABASE_URL = 'db.connection_string'
+PORTAL_PROPERTY_DATABASE_USESSL = 'db.use_ssl'
+PORTAL_PROPERTY_SPRING_DATABASE_USER = 'spring.datasource.username'
+PORTAL_PROPERTY_SPRING_DATABASE_PW = 'spring.datasource.password'
+PORTAL_PROPERTY_SPRING_DATABASE_URL = 'spring.datasource.url'
+REQUIRED_DATABASE_PROPERTIES = [PORTAL_PROPERTY_SPRING_DATABASE_USER, PORTAL_PROPERTY_SPRING_DATABASE_PW, PORTAL_PROPERTY_SPRING_DATABASE_URL]
+
+# provides a key for data types to metafile specification dict.
+class MetaFileTypes(object):
+    """how we differentiate between data types."""
+    STUDY = 'meta_study'
+    CANCER_TYPE = 'meta_cancer_type'
+    SAMPLE_ATTRIBUTES = 'meta_clinical_sample'
+    PATIENT_ATTRIBUTES = 'meta_clinical_patient'
+    CNA_DISCRETE = 'meta_CNA'
+    CNA_DISCRETE_LONG = 'meta_CNA_long'
+    CNA_LOG2 = 'meta_log2CNA'
+    CNA_CONTINUOUS = 'meta_contCNA'
+    SEG = 'meta_segment'
+    EXPRESSION = 'meta_expression'
+    MUTATION = 'meta_mutations_extended'
+    MUTATION_UNCALLED = 'meta_mutations_uncalled'
+    METHYLATION = 'meta_methylation'
+    PROTEIN = 'meta_protein'
+    GISTIC_GENES = 'meta_gistic_genes'
+    TIMELINE = 'meta_timeline'
+    CASE_LIST = 'case_list'
+    MUTATION_SIGNIFICANCE = 'meta_mutsig'
+    GENE_PANEL_MATRIX = 'meta_gene_panel_matrix'
+    GSVA_SCORES = 'meta_gsva_scores'
+    GSVA_PVALUES = 'meta_gsva_pvalues'
+    GENERIC_ASSAY_CONTINUOUS = 'meta_generic_assay_continuous'
+    GENERIC_ASSAY_BINARY = 'meta_generic_assay_binary'
+    GENERIC_ASSAY_CATEGORICAL = 'meta_generic_assay_categorical'
+    STRUCTURAL_VARIANT = 'meta_structural_variants'
+    SAMPLE_RESOURCES = 'meta_resource_sample'
+    PATIENT_RESOURCES = 'meta_resource_patient'
+    STUDY_RESOURCES = 'meta_resource_study'
+    RESOURCES_DEFINITION = 'meta_resource_definition'
+
+
+# fields allowed in each meta file type, maps to True if required
+META_FIELD_MAP = {
+    MetaFileTypes.CANCER_TYPE: {
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'data_filename': True
+    },
+    MetaFileTypes.STUDY: {
+        'cancer_study_identifier': True,
+        'type_of_cancer': True,
+        'name': True,
+        'description': True,
+        'citation': False,
+        'pmid': False,
+        'groups': False,
+        'add_global_case_list': False,
+        'tags_file': False,
+        'reference_genome': False
+    },
+    MetaFileTypes.SAMPLE_ATTRIBUTES: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'data_filename': True
+    },
+    MetaFileTypes.PATIENT_ATTRIBUTES: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'data_filename': True
+    },
+    MetaFileTypes.CNA_DISCRETE: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False,
+        'pd_annotations_filename': False
+    },
+    MetaFileTypes.CNA_DISCRETE_LONG: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False,
+        'namespaces': False
+    },
+    MetaFileTypes.CNA_LOG2: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False
+    },
+    MetaFileTypes.CNA_CONTINUOUS: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False
+    },
+    MetaFileTypes.SEG: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'reference_genome_id': True,
+        'data_filename': True,
+        'description': True
+    },
+    MetaFileTypes.MUTATION: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'normal_samples_list': False,
+        'swissprot_identifier': False,
+        'gene_panel': False,
+        'variant_classification_filter': False,
+        'namespaces': False
+    },
+    MetaFileTypes.MUTATION_UNCALLED: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': False,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'normal_samples_list': False,
+        'swissprot_identifier': False,
+        'gene_panel': False,
+        'variant_classification_filter': False,
+        'namespaces': False
+    },
+    MetaFileTypes.EXPRESSION: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'source_stable_id': False,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False
+    },
+    MetaFileTypes.METHYLATION: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False
+    },
+    MetaFileTypes.PROTEIN: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False
+    },
+    MetaFileTypes.GISTIC_GENES: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'reference_genome_id': True,
+        'data_filename': True
+    },
+    MetaFileTypes.TIMELINE: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'data_filename': True
+    },
+    MetaFileTypes.CASE_LIST: {
+        'cancer_study_identifier': True,
+        'stable_id': True,
+        'case_list_name': True,
+        'case_list_description': True,
+        'case_list_ids': True,
+        'case_list_category': False # TODO this is used in org.mskcc.cbio.portal.model.AnnotatedPatientSets.getDefaultPatientList(), decide whether to keeep, see #494
+    },
+    MetaFileTypes.MUTATION_SIGNIFICANCE: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'data_filename': True
+    },
+    MetaFileTypes.GENE_PANEL_MATRIX: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'data_filename': True
+    },
+    MetaFileTypes.GSVA_PVALUES: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'source_stable_id': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'geneset_def_version': True
+    },
+    MetaFileTypes.GSVA_SCORES: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'source_stable_id': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'show_profile_in_analysis_tab': True,
+        'geneset_def_version': True
+    },
+    MetaFileTypes.GENERIC_ASSAY_CONTINUOUS: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'generic_assay_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'show_profile_in_analysis_tab': True,
+        'generic_entity_meta_properties': False,
+        'pivot_threshold_value': False,
+        'value_sort_order': False,
+        'patient_level': False
+    },
+    MetaFileTypes.GENERIC_ASSAY_BINARY: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'generic_assay_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'show_profile_in_analysis_tab': True,
+        'generic_entity_meta_properties': False,
+        'patient_level': False
+    },
+    MetaFileTypes.GENERIC_ASSAY_CATEGORICAL: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'generic_assay_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'show_profile_in_analysis_tab': True,
+        'generic_entity_meta_properties': False,
+        'patient_level': False
+    },
+    MetaFileTypes.STRUCTURAL_VARIANT: {
+        'cancer_study_identifier': True,
+        'genetic_alteration_type': True,
+        'datatype': True,
+        'stable_id': True,
+        'show_profile_in_analysis_tab': True,
+        'profile_name': True,
+        'profile_description': True,
+        'data_filename': True,
+        'gene_panel': False,
+        'namespaces': False
+    },
+    MetaFileTypes.SAMPLE_RESOURCES: {
+        'cancer_study_identifier': True,
+        'resource_type': True,
+        'data_filename': True
+    },
+    MetaFileTypes.PATIENT_RESOURCES: {
+        'cancer_study_identifier': True,
+        'resource_type': True,
+        'data_filename': True
+    },
+    MetaFileTypes.STUDY_RESOURCES: {
+        'cancer_study_identifier': True,
+        'resource_type': True,
+        'data_filename': True
+    },
+    MetaFileTypes.RESOURCES_DEFINITION: {
+        'cancer_study_identifier': True,
+        'resource_type': True,
+        'data_filename': True
+    },
+}
+
+# order is important! This is the order in which they should be loaded:
+INCREMENTAL_UPLOAD_SUPPORTED_META_TYPES = [
+    MetaFileTypes.PATIENT_ATTRIBUTES,
+    MetaFileTypes.SAMPLE_ATTRIBUTES,
+    MetaFileTypes.MUTATION,
+    MetaFileTypes.MUTATION_UNCALLED,
+    MetaFileTypes.EXPRESSION,
+    MetaFileTypes.CNA_DISCRETE,
+    MetaFileTypes.CNA_DISCRETE_LONG,
+    MetaFileTypes.CNA_CONTINUOUS,
+    MetaFileTypes.CNA_LOG2,
+    MetaFileTypes.METHYLATION,
+    MetaFileTypes.PROTEIN,
+    MetaFileTypes.GENERIC_ASSAY_CONTINUOUS,
+    MetaFileTypes.GENERIC_ASSAY_BINARY,
+    MetaFileTypes.GENERIC_ASSAY_CATEGORICAL,
+    MetaFileTypes.TIMELINE,
+    MetaFileTypes.GENE_PANEL_MATRIX,
+    MetaFileTypes.STRUCTURAL_VARIANT,
+    MetaFileTypes.SEG,
+]
+
+IMPORTER_CLASSNAME_BY_META_TYPE = {
+    MetaFileTypes.STUDY: IMPORT_STUDY_CLASS,
+    MetaFileTypes.CANCER_TYPE: IMPORT_CANCER_TYPE_CLASS,
+    MetaFileTypes.SAMPLE_ATTRIBUTES: "org.mskcc.cbio.portal.scripts.ImportClinicalData",
+    MetaFileTypes.PATIENT_ATTRIBUTES: "org.mskcc.cbio.portal.scripts.ImportClinicalData",
+    MetaFileTypes.CNA_DISCRETE: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.CNA_DISCRETE_LONG: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.CNA_LOG2: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.CNA_CONTINUOUS: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.SEG: "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData",
+    MetaFileTypes.EXPRESSION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.MUTATION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.MUTATION_UNCALLED: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.METHYLATION: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.PROTEIN: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.GISTIC_GENES: "org.mskcc.cbio.portal.scripts.ImportGisticData",
+    MetaFileTypes.TIMELINE: "org.mskcc.cbio.portal.scripts.ImportTimelineData",
+    MetaFileTypes.CASE_LIST: IMPORT_CASE_LIST_CLASS,
+    MetaFileTypes.MUTATION_SIGNIFICANCE: "org.mskcc.cbio.portal.scripts.ImportMutSigData",
+    MetaFileTypes.GENE_PANEL_MATRIX: "org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap",
+    MetaFileTypes.GSVA_SCORES: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.GSVA_PVALUES: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.GENERIC_ASSAY_CONTINUOUS: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.GENERIC_ASSAY_BINARY: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.GENERIC_ASSAY_CATEGORICAL: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.STRUCTURAL_VARIANT: "org.mskcc.cbio.portal.scripts.ImportProfileData",
+    MetaFileTypes.SAMPLE_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
+    MetaFileTypes.PATIENT_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
+    MetaFileTypes.STUDY_RESOURCES: "org.mskcc.cbio.portal.scripts.ImportResourceData",
+    MetaFileTypes.RESOURCES_DEFINITION: "org.mskcc.cbio.portal.scripts.ImportResourceDefinition",
+}
+
+IMPORTER_REQUIRES_METADATA = {
+    "org.mskcc.cbio.portal.scripts.ImportClinicalData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportCopyNumberSegmentData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportGisticData" : False,
+    "org.mskcc.cbio.portal.scripts.ImportMutSigData" : False,
+    "org.mskcc.cbio.portal.scripts.ImportProfileData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportTimelineData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportGenePanelProfileMap" : False,
+    "org.mskcc.cbio.portal.scripts.ImportResourceData" : True,
+    "org.mskcc.cbio.portal.scripts.ImportResourceDefinition" : True
+}
+
+# ------------------------------------------------------------------------------
+# class definitions
+
+class ValidationMessageFormatter(logging.Formatter):
+
+    """Logging formatter with optional fields for data validation messages.
+
+    These fields are:
+    filename_ - the path to the file the message is about (if applicable)
+    line_number - a line number within the above file (if applicable)
+    column_number - a column number within the above file (if applicable)
+    cause - the unexpected value found in the input (if applicable)
+
+    If instead a message pertains to multiple values of one of these
+    fields (as the result of aggregation by CollapsingLogMessageHandler),
+    these will be expected in the field <fieldname>_list.
+    """
+
+    def format(self, record, *args, **kwargs):
+        """Check consistency of expected fields and format the record."""
+        if (
+                (
+                    hasattr(record, 'line_number') or
+                    hasattr(record, 'line_number_list') or
+                    hasattr(record, 'column_number') or
+                    hasattr(record, 'column_number_list'))
+                and not hasattr(record, 'filename_')):
+            raise ValueError(
+                'Tried to log about a line/column with no filename')
+        return super(ValidationMessageFormatter, self).format(record,
+                                                              *args,
+                                                              **kwargs)
+
+    @staticmethod
+    def format_aggregated(record,
+                          field_name,
+                          single_fmt='%s',
+                          multiple_fmt='[%s]',
+                          join_string=', ',
+                          max_join=3,
+                          optional=False):
+        """Format a human-readable string for a field or its <field>_list.
+
+        From log records as generated by the flush() method of
+        CollapsingLogMessageHandler. If the field was not aggregated, format
+        it according to the format string `single_fmt`. If it was, coerce the
+        first `max_join` values to strings, concatenate them separated by
+        `join_string`, and format the result according to `multiple_fmt`.
+
+        If `max_join` is None, join all values and apply no maximum length.
+
+        If `optional` is True and both the field and its list are absent,
+        return an empty string.
+        """
+        attr_val = getattr(record, field_name, None)
+        attr_list = getattr(record, field_name + '_list', None)
+        if attr_val is not None:
+            attr_indicator = single_fmt % attr_val
+        elif attr_list is not None:
+            # treat None as 'format all of them, no maximum'
+            if max_join is None:
+                max_join = len(attr_list)
+            string_list = list(str(val) for val in attr_list[:max_join])
+            num_skipped = len(attr_list) - len(string_list)
+            if num_skipped != 0:
+                string_list.append('(%d more)' % num_skipped)
+            attr_indicator = multiple_fmt % join_string.join(string_list)
+        elif optional:
+            attr_indicator = ''
+        else:
+            raise ValueError(
+                "Tried to format an absent non-optional log field: '%s'" %
+                field_name)
+        return attr_indicator
+
+
+class LogfileStyleFormatter(ValidationMessageFormatter):
+
+    """Formatter for validation messages in a simple one-per-line format."""
+
+    def __init__(self, study_dir):
+        """Initialize a logging Formatter with an appropriate format string."""
+        super(LogfileStyleFormatter, self).__init__(
+            fmt='%(levelname)s: %(file_indicator)s:'
+                '%(line_indicator)s%(column_indicator)s'
+                ' %(message)s%(cause_indicator)s')
+        self.study_dir = study_dir
+        self.previous_filename = None
+
+    def format(self, record):
+
+        """Generate descriptions for optional fields and format the record."""
+
+
+        if not hasattr(record, 'filename_'):
+            record.file_indicator = '-'
+        else:
+            record.file_indicator = os.path.relpath(record.filename_.strip(),
+                                                    self.study_dir)
+        record.line_indicator = self.format_aggregated(
+            record,
+            'line_number',
+            ' line %d:',
+            ' lines [%s]:',
+            optional=True)
+        record.column_indicator = self.format_aggregated(
+            record,
+            'column_number',
+            ' column %d:',
+            ' columns [%s]:',
+            optional=True)
+        record.cause_indicator = self.format_aggregated(
+            record,
+            'cause',
+            "; value encountered: '%s'",
+            "; values encountered: ['%s']",
+            join_string="', '",
+            optional=True)
+
+        # format the string based on these fields
+        formatted_result = super(LogfileStyleFormatter, self).format(record)
+
+        # prepend an empty line if the filename is different than before
+        current_filename = getattr(record, 'filename_', '')
+        if (self.previous_filename is not None and
+                current_filename != self.previous_filename):
+            formatted_result = '\n' + formatted_result
+        self.previous_filename = current_filename
+
+        return formatted_result
+
+
+class CollapsingLogMessageHandler(logging.handlers.MemoryHandler):
+
+    """Logging handler that aggregates repeated log messages into one.
+
+    This collapses validation LogRecords based on the source code line that
+    emitted them and their formatted message, and flushes the resulting
+    records to another handler.
+    """
+
+    # TODO make it collapse messages on emit, instead of keeping it all in RAM
+    def flush(self):
+
+        """Aggregate LogRecords by message and send them to the target handler.
+
+        Fields that occur with multiple different values in LogRecords
+        emitted from the same line with the same message (and optional
+        'filename_' attribute) will be collected in a field named
+        <field_name>_list.
+        """
+
+        # group buffered LogRecords by their source code line and message
+        grouping_dict = OrderedDict()
+        for record in self.buffer:
+            identifying_tuple = (record.module,
+                                 record.lineno,
+                                 getattr(record, 'filename_', None),
+                                 record.getMessage())
+            if identifying_tuple not in grouping_dict:
+                grouping_dict[identifying_tuple] = []
+
+            # add a tuple that keeps the relation between the line number,
+            # the column number and the cause for the HTML report
+            record.__dict__['value'] = (
+                getattr(record, 'line_number', None),
+                getattr(record, 'column_number', None),
+                getattr(record, 'cause', None))
+
+            grouping_dict[identifying_tuple].append(record)
+        
+        aggregated_buffer = []
+        # for each list of same-message records
+        for record_list in list(grouping_dict.values()):
+            # make a dict to collect the fields for the aggregate record
+            aggregated_field_dict = {}
+            # for each field found in (the first of) the records
+            for field_name in record_list[0].__dict__:
+                # collect the values found for this field across the records.
+                # Use the keys of an OrderedDict, as OrderedSet is for some
+                # reason not to be found in the Python standard library.
+                field_values = OrderedDict((record.__dict__[field_name], None)
+                                           for record in record_list)
+                # if this field has the same value in all records
+                if len(field_values) == 1:
+                    # use that value in the new dict
+                    aggregated_field_dict[field_name] = field_values.popitem()[0]
+                else:
+                    # set a <field>_list field instead
+                    aggregated_field_dict[field_name + '_list'] = \
+                        list(field_values.keys())
+
+            # add a new log record with these fields tot the output buffer
+            aggregated_buffer.append(
+                logging.makeLogRecord(aggregated_field_dict))
+
+        # replace the buffer with the aggregated one and flush
+        self.buffer = aggregated_buffer
+        super(CollapsingLogMessageHandler, self).flush()
+
+    def shouldFlush(self, record):
+        """Collapse and flush every time a debug message is emitted."""
+        return (record.levelno == logging.DEBUG or
+                super(CollapsingLogMessageHandler, self).shouldFlush(record))
+
+
+# ------------------------------------------------------------------------------
+# sub-routines
+
+def get_meta_file_type(meta_dictionary, logger, filename):
+    """
+     Returns one of the metatypes found in MetaFileTypes
+    """
+    # The following dictionary is required to define the MetaFileType for all
+    # combinations, which are used in validateData to determine which validator
+    # should be used.
+    # GENETIC_ALTERATION_TYPE    DATATYPE    meta
+    alt_type_datatype_to_meta = {
+        # cancer type
+        ("CANCER_TYPE", "CANCER_TYPE"): MetaFileTypes.CANCER_TYPE,
+        # clinical and timeline
+        ("CLINICAL", "PATIENT_ATTRIBUTES"): MetaFileTypes.PATIENT_ATTRIBUTES,
+        ("CLINICAL", "SAMPLE_ATTRIBUTES"): MetaFileTypes.SAMPLE_ATTRIBUTES,
+        ("CLINICAL", "TIMELINE"): MetaFileTypes.TIMELINE,
+        # rppa and mass spectrometry
+        ("PROTEIN_LEVEL", "LOG2-VALUE"): MetaFileTypes.PROTEIN,
+        ("PROTEIN_LEVEL", "Z-SCORE"): MetaFileTypes.PROTEIN,
+        ("PROTEIN_LEVEL", "CONTINUOUS"): MetaFileTypes.PROTEIN,
+        # cna
+        ("COPY_NUMBER_ALTERATION", "DISCRETE"): MetaFileTypes.CNA_DISCRETE,
+        ("COPY_NUMBER_ALTERATION", "DISCRETE_LONG"): MetaFileTypes.CNA_DISCRETE_LONG,
+        ("COPY_NUMBER_ALTERATION", "CONTINUOUS"): MetaFileTypes.CNA_CONTINUOUS,
+        ("COPY_NUMBER_ALTERATION", "LOG2-VALUE"): MetaFileTypes.CNA_LOG2,
+        ("COPY_NUMBER_ALTERATION", "SEG"): MetaFileTypes.SEG,
+        # expression
+        ("MRNA_EXPRESSION", "CONTINUOUS"): MetaFileTypes.EXPRESSION,
+        ("MRNA_EXPRESSION", "Z-SCORE"): MetaFileTypes.EXPRESSION,
+        ("MRNA_EXPRESSION", "DISCRETE"): MetaFileTypes.EXPRESSION,
+        # mutations
+        ("MUTATION_EXTENDED", "MAF"): MetaFileTypes.MUTATION,
+        ("MUTATION_UNCALLED", "MAF"): MetaFileTypes.MUTATION_UNCALLED,
+        # others
+        ("METHYLATION", "CONTINUOUS"): MetaFileTypes.METHYLATION,
+        ("GENE_PANEL_MATRIX", "GENE_PANEL_MATRIX"): MetaFileTypes.GENE_PANEL_MATRIX,
+        ("STRUCTURAL_VARIANT", "SV"): MetaFileTypes.STRUCTURAL_VARIANT,
+        # cross-sample molecular statistics (for gene selection)
+        ("GISTIC_GENES_AMP", "Q-VALUE"): MetaFileTypes.GISTIC_GENES,
+        ("GISTIC_GENES_DEL", "Q-VALUE"): MetaFileTypes.GISTIC_GENES,
+        ("MUTSIG", "Q-VALUE"): MetaFileTypes.MUTATION_SIGNIFICANCE,
+        ("GENESET_SCORE", "GSVA-SCORE"): MetaFileTypes.GSVA_SCORES,
+        ("GENESET_SCORE", "P-VALUE"): MetaFileTypes.GSVA_PVALUES,
+        ("GENERIC_ASSAY", "LIMIT-VALUE"): MetaFileTypes.GENERIC_ASSAY_CONTINUOUS,
+        ("GENERIC_ASSAY", "BINARY"): MetaFileTypes.GENERIC_ASSAY_BINARY,
+        ("GENERIC_ASSAY", "CATEGORICAL"): MetaFileTypes.GENERIC_ASSAY_CATEGORICAL
+    }
+    result = None
+    if 'genetic_alteration_type' in meta_dictionary and 'datatype' in meta_dictionary:
+        genetic_alteration_type = meta_dictionary['genetic_alteration_type']
+        data_type = meta_dictionary['datatype']
+        if (genetic_alteration_type, data_type) in alt_type_datatype_to_meta:
+            result = alt_type_datatype_to_meta[(genetic_alteration_type, data_type)]
+        else:
+            if meta_dictionary['datatype'] == 'FUSION':
+                logger.error(
+                    'The Fusion file format is deprecated. Consider adding the data in Structural Variant format.',
+                    extra={'filename_': filename,
+                               'cause': ('genetic_alteration_type: %s, '
+                                     'datatype: %s' % (
+                                         meta_dictionary['genetic_alteration_type'],
+                                         meta_dictionary['datatype']))})
+            else:
+                logger.error(
+                    'Could not determine the file type. Please check your meta files for correct configuration.',
+                    extra={'filename_': filename,
+                               'cause': ('genetic_alteration_type: %s, '
+                                     'datatype: %s' % (
+                                         meta_dictionary['genetic_alteration_type'],
+                                         meta_dictionary['datatype']))})
+    elif 'cancer_study_identifier' in meta_dictionary and 'type_of_cancer' in meta_dictionary:
+        result = MetaFileTypes.STUDY
+    elif 'type_of_cancer' in meta_dictionary:
+        result = MetaFileTypes.CANCER_TYPE
+    elif 'cancer_study_identifier' in meta_dictionary and 'resource_type' in meta_dictionary:
+        if meta_dictionary['resource_type'] == 'PATIENT':
+            result = MetaFileTypes.PATIENT_RESOURCES
+        elif meta_dictionary['resource_type'] == 'SAMPLE':
+            result = MetaFileTypes.SAMPLE_RESOURCES
+        elif meta_dictionary['resource_type'] == 'STUDY':
+            result = MetaFileTypes.STUDY_RESOURCES
+        elif meta_dictionary['resource_type'] == 'DEFINITION':
+            result = MetaFileTypes.RESOURCES_DEFINITION
+    else:
+        logger.error('Could not determine the file type. Did not find expected meta file fields. Please check your meta files for correct configuration.',
+                         extra={'filename_': filename})
+    return result
+
+
+def validate_types_and_id(meta_dictionary, logger, filename):
+    """
+    Validate a genetic_alteration_type, datatype (and stable_id in some cases) against predefined allowed combinations.
+    """
+    result = True
+
+    # Define allowed combinations as a dictionary
+    allowed_combinations = {
+        ("COPY_NUMBER_ALTERATION", "DISCRETE", "cna"),
+        ("COPY_NUMBER_ALTERATION", "DISCRETE_LONG", "cna"),
+        ("COPY_NUMBER_ALTERATION", "DISCRETE", "cna_rae"),
+        ("COPY_NUMBER_ALTERATION", "DISCRETE", "cna_consensus"),
+        ("COPY_NUMBER_ALTERATION", "DISCRETE", "gistic"),
+        ("COPY_NUMBER_ALTERATION", "DISCRETE_LONG", "gistic"),
+        ("COPY_NUMBER_ALTERATION", "CONTINUOUS", "linear_CNA"),
+        ("COPY_NUMBER_ALTERATION", "LOG2-VALUE", "log2CNA"),
+        ("MUTATION_EXTENDED", "MAF", "mutations"),
+        ("MUTATION_UNCALLED", "MAF", "mutations_uncalled"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna_U133"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_U133_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_U133_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_mrna_median_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_mrna_median_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_median_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "rna_seq_mrna"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "rna_seq_v2_mrna"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_v2_mrna_median_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_v2_mrna_median_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "rna_seq_v2_mrna_median_normals"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_v2_mrna_median_normals_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_v2_mrna_median_all_sample_ref_normal_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mirna"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mirna_median_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_merged_median_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna"),       
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_median_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "DISCRETE", "mrna_outliers"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna_seq_fpkm_capture"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_capture_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_capture_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "rna_seq_mrna_capture"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_mrna_capture_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "rna_seq_mrna_capture_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_polya_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_fpkm_polya_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna_seq_fpkm_polya"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna_seq_cpm"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_cpm_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_cpm_Zscores"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna_seq_tpm"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_tpm_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_tpm_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_zbynorm"),
+        ("MRNA_EXPRESSION", "CONTINUOUS", "mrna_seq_fpkm"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_all_sample_Zscores"),
+        ("MRNA_EXPRESSION", "Z-SCORE", "mrna_seq_read_counts_Zscores"),
+        ("METHYLATION", "CONTINUOUS", "methylation_hm27"),
+        ("METHYLATION", "CONTINUOUS", "methylation_hm450"),
+        ("METHYLATION", "CONTINUOUS", "methylation_epic"),
+        ("METHYLATION", "CONTINUOUS", "methylation_promoters_rrbs"),
+        ("PROTEIN_LEVEL", "LOG2-VALUE", "rppa"),
+        ("PROTEIN_LEVEL", "Z-SCORE", "rppa_Zscores"),
+        ("PROTEIN_LEVEL", "CONTINUOUS", "protein_quantification"),
+        ("PROTEIN_LEVEL", "Z-SCORE", "protein_quantification_zscores"),
+        ("PROTEIN_LEVEL", "LOG2-VALUE", "protein_quantification"),
+        ("GENESET_SCORE", "GSVA-SCORE", "gsva_scores"),
+        ("GENESET_SCORE", "P-VALUE", "gsva_pvalues"),
+        ("GENERIC_ASSAY", "LIMIT-VALUE", "*"),
+        ("GENERIC_ASSAY", "BINARY", "*"),
+        ("GENERIC_ASSAY", "CATEGORICAL", "*"),
+        ("STRUCTURAL_VARIANT", "SV", "structural_variants")
+    }
+
+    # Extract required fields
+    if "genetic_alteration_type" in meta_dictionary and "datatype" in meta_dictionary and "stable_id" in meta_dictionary:
+        genetic_alteration_type = meta_dictionary["genetic_alteration_type"]
+        data_type = meta_dictionary["datatype"]
+        stable_id = meta_dictionary["stable_id"]
+
+        # Validate the combination
+        if (genetic_alteration_type, data_type, stable_id) not in allowed_combinations and \
+           (genetic_alteration_type, data_type, "*") not in allowed_combinations:
+            logger.error(
+                "Invalid genetic_alteration_type, datatype, and stable_id combination: (%s, %s, %s). "
+                "Please check your meta files.",
+                genetic_alteration_type, data_type, stable_id,
+                extra={'filename_': filename,
+                       'cause': stable_id}
+            )
+            result = False
+
+    return result
+
+def parse_metadata_file(filename,
+                        logger,
+                        study_id=None,
+                        case_list=False,
+                        gene_panel_list=None):
+
+    """Validate a metafile and return a dictionary of values read from it and
+    the meta_file_type according to get_meta_file_type.
+
+    `meta_file_type` will be `None` if the file is invalid. If `case_list`
+    is True, read the file as a case list instead of a meta file.
+
+    :param filename: name of the meta file
+    :param logger: the logging.Logger instance to log warnings and errors to
+    :param study_id: (optional - set if you want study_id to be validated)
+                    cancer study id found in previous files (or None). All subsequent
+                    meta files should comply to this in the field 'cancer_study_identifier'
+    :param case_list: whether this meta file is a case list (special case)
+    :param gene_panel_list: (optional - set if you want this to be validated)
+                           list of gene panels in the database
+    """
+
+    logger.debug('Starting validation of meta file', extra={'filename_': filename})
+
+    # Read meta file
+    meta_dictionary = OrderedDict()
+    with open(filename, 'r') as metafile:
+        for line_index, line in enumerate(metafile):
+            # skip empty lines:
+            if line.strip() == '':
+                continue
+            if ':' not in line:
+                logger.error(
+                    "Invalid %s file entry, no ':' found",
+                    {True: 'case list', False: 'meta'}[case_list],
+                    extra={'filename_': filename,
+                           'line_number': line_index + 1})
+                meta_dictionary['meta_file_type'] = None
+                return dict(meta_dictionary)
+            key_value = line.split(':', 1)
+            if len(key_value) == 2:
+                meta_dictionary[key_value[0]] = key_value[1].strip()
+
+    # Determine meta file type
+    if case_list:
+        meta_file_type = MetaFileTypes.CASE_LIST
+        meta_dictionary['meta_file_type'] = meta_file_type
+    else:
+        meta_file_type = get_meta_file_type(meta_dictionary, logger, filename)
+        meta_dictionary['meta_file_type'] = meta_file_type
+        # if type could not be inferred, no further validations are possible
+        if meta_file_type is None:
+            return dict(meta_dictionary)
+
+
+    # Check for missing fields for this specific meta file type
+    missing_fields = []
+    for field in META_FIELD_MAP[meta_file_type]:
+        mandatory = META_FIELD_MAP[meta_file_type][field]
+        if field not in meta_dictionary and mandatory:
+            logger.error("Missing field '%s' in %s file",
+                         field,
+                         {True: 'case list', False: 'meta'}[case_list],
+                         extra={'filename_': filename})
+            missing_fields.append(field)
+
+    if missing_fields:
+        # all further checks would depend on these fields being present
+        meta_dictionary['meta_file_type'] = None
+        return dict(meta_dictionary)
+
+    # validate genetic_alteration_type, datatype, stable_id
+    stable_id_mandatory = META_FIELD_MAP[meta_file_type].get('stable_id',
+                                                             False)
+    if stable_id_mandatory:
+        valid_types_and_id = validate_types_and_id(meta_dictionary, logger, filename)
+        if not valid_types_and_id:
+            # invalid meta file type
+            meta_dictionary['meta_file_type'] = None
+            return dict(meta_dictionary)
+
+    # check for extra unrecognized fields
+    for field in meta_dictionary:
+        if field not in META_FIELD_MAP[meta_file_type]:
+
+            # Don't give warning for added 'meta_file_type'
+            if field == "meta_file_type":
+                pass
+            else:
+                logger.warning(
+                    'Unrecognized field in %s file',
+                    {True: 'case list', False: 'meta'}[case_list],
+                    extra={'filename_': filename,
+                           'cause': field})
+
+    # check that cancer study identifiers across files so far are consistent.
+    if (
+            study_id is not None and
+            'cancer_study_identifier' in meta_dictionary and
+            study_id != meta_dictionary['cancer_study_identifier']):
+        logger.error(
+            "Cancer study identifier is not consistent across "
+            "files, expected '%s'",
+            study_id,
+            extra={'filename_': filename,
+                   'cause': meta_dictionary['cancer_study_identifier']})
+        # not a valid meta file in this study
+        meta_dictionary['meta_file_type'] = None
+        return dict(meta_dictionary)
+
+    # type-specific validations
+
+    # Validate length of attributes in meta study file
+    # TODO: do this for all other meta files as well
+    meta_study_attribute_size_dict = {'cancer_study_identifier': 255,
+                                      'type_of_cancer': 63,
+                                      'name': 255,
+                                      'description': 1024,
+                                      'citation': 200,
+                                      'pmid': 1024,
+                                      'groups': 200,
+                                      'short_name': 64
+                                      }
+    if meta_file_type == MetaFileTypes.STUDY:
+        for attribute in meta_study_attribute_size_dict:
+            if attribute in meta_dictionary:
+                if len(meta_dictionary[attribute]) > meta_study_attribute_size_dict[attribute]:
+                    logger.error("The maximum length of the '%s' "
+                                 "value is %s" % (attribute,
+                                                  meta_study_attribute_size_dict[attribute]),
+                                 extra={'filename_': filename,
+                                        'cause': meta_dictionary[attribute] + ' (%s)' % len(meta_dictionary[attribute])}
+                                 )
+
+    # Restrict the show_profile_in_analysis_tab value to false (https://github.com/cBioPortal/cbioportal/issues/5023)
+    if meta_file_type in (MetaFileTypes.CNA_CONTINUOUS, MetaFileTypes.CNA_LOG2):
+        if meta_dictionary['show_profile_in_analysis_tab'] != 'false':
+            logger.error("The 'show_profile_in_analysis_tab' setting must be 'false', as this is only applicable for "
+                        "CNA data of the DISCRETE type.",
+                        extra={'filename_': filename,
+                        'cause': 'show_profile_in_analysis_tab: %s' % meta_dictionary['show_profile_in_analysis_tab']})
+
+    if meta_file_type in (MetaFileTypes.SEG, MetaFileTypes.GISTIC_GENES):
+        # Todo: Restore validation for reference genome in segment files
+        # Validation can be restored to normal when hg18 data on public portal and data hub has been
+        # liftovered to hg19. It was decided in the data hub call of August 14 2018 to remove validation until then.
+        valid_segment_reference_genomes = ['hg19','hg38']
+        if meta_dictionary['reference_genome_id'] not in valid_segment_reference_genomes:
+            logger.error(
+                'Reference_genome_id is not %s',
+                ' or '.join(valid_segment_reference_genomes),
+                extra={'filename_': filename,
+                       'cause': meta_dictionary['reference_genome_id']})
+            meta_dictionary['meta_file_type'] = None
+
+    if meta_file_type in [MetaFileTypes.MUTATION, MetaFileTypes.MUTATION_UNCALLED]:
+        if ('swissprot_identifier' in meta_dictionary and
+                meta_dictionary['swissprot_identifier'] not in ('name',
+                                                               'accession')):
+            logger.error(
+                "Invalid swissprot_identifier specification, must be either "
+                "'name' or 'accession'",
+                extra={'filename_': filename,
+                       'cause': meta_dictionary['swissprot_identifier']})
+            meta_dictionary['meta_file_type'] = None
+
+        # Check whether the gene panel property is included in the mutation meta file. This should be an error.
+        if 'gene_panel' in meta_dictionary:
+            logger.warning("Including the stable ID for gene panels in meta file might lead to incorrect "
+                           "results for samples that are profiled but nu mutations are called. Consider adding a column"
+                           " for mutation profile to gene panel matrix file",
+                           extra={'filename_': filename,
+                                  'cause': 'gene_panel: %s' % meta_dictionary['gene_panel']})
+
+    # When validating
+    if gene_panel_list:
+        # Check whether the gene panel in the gene panel property field corresponds with a gene panel in the database
+        if 'gene_panel' in meta_dictionary:
+            if meta_dictionary['gene_panel'] not in gene_panel_list and meta_dictionary['gene_panel'] != 'NA':
+                logger.error('Gene panel ID is not in database. Please import this gene panel before loading '
+                             'study data.',
+                             extra={'filename_': filename,
+                                    'cause': meta_dictionary['gene_panel']})
+
+    # Save information regarding `source_stable_id`, so that after all meta files are validated,
+    # we can validate fields between meta files in validate_data_relations() in validateData.py
+    global gsva_scores_stable_id
+    global gsva_scores_source_stable_id
+    global gsva_pvalues_source_stable_id
+    global gsva_scores_filename
+    global gsva_pvalues_filename
+
+    # save all expression `stable_id` in a dictionary with their filenames
+    if meta_file_type is MetaFileTypes.EXPRESSION:
+        if 'stable_id' in meta_dictionary:
+            expression_stable_ids[meta_dictionary['stable_id']] = filename
+
+            # Save all zscore expression `source_stable_id` in dictionary with their filenames.
+            # Multiple zscore expression files are possible, and we want to validate all their
+            # source_stable_ids with expression stable ids
+            if meta_dictionary['datatype'] == "Z-SCORE":
+                if 'source_stable_id' in meta_dictionary:
+                    expression_zscores_source_stable_ids[meta_dictionary['source_stable_id']] = filename
+
+    # save stable_id and source_stable_id of GSVA Scores
+    if meta_file_type is MetaFileTypes.GSVA_SCORES:
+        gsva_scores_filename = filename
+        if 'source_stable_id' in meta_dictionary:
+            gsva_scores_source_stable_id = meta_dictionary['source_stable_id']
+
+        # save 'stable_id' to check the 'source_stable_id' in GSVA_PVALUES file
+        if 'stable_id' in meta_dictionary:
+            gsva_scores_stable_id = meta_dictionary['stable_id']
+
+    # save stable_id and source_stable_id of GSVA Pvalues
+    if meta_file_type is MetaFileTypes.GSVA_PVALUES:
+        gsva_pvalues_filename = filename
+        if 'source_stable_id' in meta_dictionary:
+            gsva_pvalues_source_stable_id = meta_dictionary['source_stable_id']
+
+    logger.info('Validation of meta file complete', extra={'filename_': filename})
+
+    return meta_dictionary
+
+
+def run_java(*args):
+    java_home = os.environ.get('JAVA_HOME', '')
+    if java_home:
+        java_command = os.path.join(java_home, 'bin', 'java')
+    else:
+        java_command = 'java'
+    full_cmd = [java_command] + list(args)
+    print(">", " ".join(full_cmd))
+    process = Popen(full_cmd, stdout=PIPE, stderr=STDOUT,
+                    universal_newlines=True)
+    ret = []
+    while process.poll() is None:
+        line = process.stdout.readline()
+        if line != '' and line.endswith('\n'):
+            print(line.strip(), file=OUTPUT_FILE)
+            ret.append(line[:-1])
+    ret.append(process.returncode)
+    # if cmd line parameters error:
+    if process.returncode == 64 or process.returncode == 2:
+        raise RuntimeError('Aborting. Step failed due to wrong parameters passed to subprocess.')
+    # any other error:
+    elif process.returncode != 0:
+        raise RuntimeError('Aborting due to error while executing step.')
+    return ret
+
+
+def properties_error_message(display_name: str, property_name: str) -> str:
+    return f"No {display_name} provided for database connection. Please set '{property_name}' in application.properties."
+
+
+class PortalProperties(object):
+    """ Properties object class, just has fields for db conn """
+
+    def __init__(self, database_user, database_pw, database_url):
+        self.database_user = database_user
+        self.database_pw = database_pw
+        self.database_url = database_url
+
+
+def get_database_properties(properties_filename: str) -> Optional[PortalProperties]:
+
+    properties = parse_properties_file(properties_filename)
+    
+    missing_properties = []
+    for required_property in REQUIRED_DATABASE_PROPERTIES:
+        if required_property not in properties or len(properties[required_property]) == 0:
+            missing_properties.append(required_property)
+    if missing_properties:
+        print(
+            'Missing required properties : (%s)' % (', '.join(missing_properties)),
+            file=ERROR_FILE)
+        return None
+
+    if properties.get(PORTAL_PROPERTY_DATABASE_HOST) is not None \
+        or properties.get(PORTAL_PROPERTY_DATABASE_NAME) is not None \
+        or properties.get(PORTAL_PROPERTY_DATABASE_USESSL) is not None \
+        or properties.get(PORTAL_PROPERTY_DATABASE_URL) is not None:
+        print("""
+            ----------------------------------------------------------------------------------------------------------------
+            -- Connection error:
+            -- You try to connect to the database using the deprecated 'db.host', 'db.portal_db_name' and 'db.use_ssl' or 'db.connection_string' properties.
+            -- Please remove these properties and use the 'db.spring.datasource.url' property instead. See https://docs.cbioportal.org/deployment/customization/application.properties-reference/
+            -- for assistance on building a valid connection string.
+            ------------------------------------------------------------f---------------------------------------------------
+        """, file=ERROR_FILE)
+        return None
+
+    return PortalProperties(properties[PORTAL_PROPERTY_SPRING_DATABASE_USER],
+                            properties[PORTAL_PROPERTY_SPRING_DATABASE_PW],
+                            properties[PORTAL_PROPERTY_SPRING_DATABASE_URL])
+
+
+def parse_properties_file(properties_filename: str) -> Dict[str, str]:
+
+    if not os.path.exists(properties_filename):
+        print('properties file %s cannot be found' % properties_filename, file=ERROR_FILE)
+        sys.exit(2)
+        
+    properties = {}
+    with open(properties_filename, 'r') as properties_file:
+        for line in properties_file:
+            line = line.strip()
+            # skip line if its blank or a comment
+            if len(line) == 0 or line.startswith('#'):
+                continue
+            try:
+                name, value = line.split('=', maxsplit=1)
+            except ValueError:
+                print(
+                    'Skipping invalid entry in property file: %s' % line,
+                    file=ERROR_FILE)
+                continue
+            properties[name] = value.strip()
+    return properties
+
+
+def get_db_cursor(portal_properties: PortalProperties):
+
+    try:
+        url_elements = dsnparse.parse(portal_properties.database_url)
+        connection_kwargs = {
+            "host": url_elements.host,
+            "port": url_elements.port if url_elements.port is not None else 3306,
+            "db": url_elements.paths[0],
+            "user": portal_properties.database_user,
+            "passwd": portal_properties.database_pw
+        }
+        if url_elements.query.get("useSSL") == "true":
+            connection_kwargs['ssl_mode'] = 'REQUIRED'
+            connection_kwargs['ssl'] = {"ssl_mode": True}
+        else:
+            if url_elements.query.get("get-server-public-key") == "true":
+                connection_kwargs['ssl'] = {
+                    'MYSQL_OPT_GET_SERVER_PUBLIC_KEY': True
+                }
+        connection = MySQLdb.connect(**connection_kwargs)
+    except MySQLdb.Error as exception:
+        print(exception, file=ERROR_FILE)
+        message = (
+            "--> Error connecting to server with URL: "
+            + portal_properties.database_url)
+        print(message, file=ERROR_FILE)
+        raise ConnectionError(message) from exception
+    if connection is not None:
+        return connection, connection.cursor()
+
+```
+
+
+```{python}
+
+## TODO: DELETE, just for simple typing
+df = df_mrna_seq
+df
+```
+
+```{python}
+
+## TODO: This is what we'll eventually use
+# df_mrna_seq_entrez_only = df_mrna_seq
+# df_mrna_seq_entrez_only = df_mrna_seq_entrez_only.drop(columns="Hugo_Symbol")
+# df_mrna_seq_entrez_only.set_index('Entrez_Gene_Id')
+
+# total_rows = df_mrna_seq_entrez_only.shape[0]
+# total_cols = df_mrna_seq_entrez_only.shape[1]
+
+## just for simplicity in typing
+## df = df_mrna_seq_entrez_only
+
+# 1. Check the Entrez Gene Id and Hugo Symbol columns: Must be unique
+
+print(len(df['Entrez_Gene_Id'].unique()))           # <1>
+print(len(df['Hugo_Symbol'].unique()))              # <1>
+
+## THEY ARE NOT UNIQUE ... let's investigate
+
+```
+1. Expected count of unique values = total_rows
+
+
+
+
+
+```{python}
+########## Duplicated Entrez ##########
+df = df_mrna_seq
+duplicated_entrez = df[df.duplicated(subset=['Entrez_Gene_Id'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Entrez_Gene_Id')
+duplicated_entrez
+```
+
+```{python}
+duplicated_entrez_distinct_count = duplicated_entrez['Entrez_Gene_Id'].nunique()
+print(f"Number of distinct Entrez Gene Id's: {duplicated_entrez_distinct_count}")
+```
+
+```{python}
+## ^^ We see that an entrez gene id has more than one Hugo symbol ... let's check if the values we get are the same or not
+duplicated_entrez_samples = df.iloc[duplicated_entrez.index,2:].transpose()
+duplicated_entrez_samples
+```
+
+```{python}
+duplicated_entrez_described = df.iloc[duplicated_entrez.index,2:].transpose().describe().transpose()
+duplicated_entrez_described
+```
+
+```{python}
+duplicated_entrez_described = duplicated_entrez.merge(duplicated_entrez_described, left_index=True, right_index=True)
+duplicated_entrez_described
+## OMG ... so ... there's this weird problem ... there are these entrez gene ID's that are the same ... but the hugo are different ... and they show different values (summmary stats) ... apparently GPT is telling me that in the modern world we use the entrez ID and merge the data ... 
+```
+
+```{python}
+
+df = df.set_index("Entrez_Gene_Id")
+df
+```
+```{python}
+duplicated_entrez_samples = df.iloc[duplicated_entrez.index,2:].transpose()
+duplicated_entrez_samples
+```
+
+```{python}
+df = duplicated_entrez_samples
+df
+```
+
+```{python}
+for col_name in dict.fromkeys(df.columns):
+    sub = df.loc[:, df.columns == col_name]
+
+    data = [sub.iloc[:, i].to_numpy(dtype=float) for i in range(sub.shape[1])]
+
+    plt.boxplot(data)
+    plt.title(f"Boxplot for: {col_name}  (repeats: {sub.shape[1]})")
+    plt.xlabel("repeat #")
+    plt.ylabel("value")
+    plt.grid(True, axis="y", alpha=0.3)
+    plt.show()
+
+# plt.boxplot(duplicated_entrez_samples)
+# plt.title("Boxplot")
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.grid(True)
+# plt.show()
+
+```
+
+
+
+
+SKIP THIS during presentation ... We're going to explore uniqueness of Hugo, and eventually Hugo && Entrez
+```{python}
+########## Duplicated Hugo ##########
+df = df_mrna_seq
+duplicated_hugo = df[df.duplicated(subset=['Hugo_Symbol'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Hugo_Symbol')
+
+## ^^ We see that an entrez gene id has more than one Hugo symbol ... let's check if the values we get are the same or not
+duplicated_hugo_described = df.iloc[duplicated_hugo.index,2:].transpose().describe().transpose()
+duplicated_hugo_described = duplicated_hugo.merge(duplicated_hugo_described, left_index=True, right_index=True)
+```
+
+Here's the Hugo && Entrez
+```{python}
+########## Duplicated Entrez AND Hugo ##########
+df = df_mrna_seq
+duplicated_entrez_and_hugo = df[df.duplicated(subset=['Entrez_Gene_Id', 'Hugo_Symbol'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Entrez_Gene_Id')
+# 
+
+
+```
+
+Start presentation again
+
+### Gene Expression
+
+Let's take a look at it
+
+```{python}
+
+# Single Plot - RSEM
+fig, ax = plot_single_gene_boxplot(
+    df_mrna_seq=df_mrna_seq,
+    gene="ERBB2",
+    set_index_fn=set_expression_matrix_index,
+    transform=None,
+    remove_zeros=True
+)
+plt.show()
+
+# Single Plot - Log
+fig, ax = plot_single_gene_boxplot(
+    df_mrna_seq=df_mrna_seq,
+    gene="ERBB2",
+    set_index_fn=set_expression_matrix_index,
+    transform="log1p",
+    remove_zeros=True,
+    title="Gene Expression",
+    subtitle="The distribution of mRNA-seq data across tumour samples"
+)
+plt.show()
+
+```
+
+
+
+
+```{python}
+
+# Use the newest fanciest creator of plots! Commented out, because we don't really want it running all the time. 
+
+# Properly index the dataframe, so it is unique.
+X = set_expression_matrix_index(df_mrna_seq)
+
+# Make a few figures for 20 genes
+rows, all_metrics, saved = plot_selected_genes_suite(
+    X,
+    genes=X.index[:20],
+    figures={"expr_pos", "cv_pos", "ecdf_z_pos"},
+    output_dir="plots_20_genes",
+    save=True,
+    show=True,
+    close=True,
+    dpi=150,
+)
+
+# # Full dataset, one figure
+# rows, all_metrics, saved = plot_selected_genes_suite(
+#     X,
+#     genes=X.index,
+#     figures={"ecdf_z_pos"},
+#     output_dir="plots_all_genes",
+#     save=True,
+#     show=False,
+#     close=True,
+#     dpi=150,
+# )
+
+
+```
+
+
+#### Subtype
+
+```{python}
+# Creating all the objects I need, because I keep making them over and over again. 
+
+
+
+
+# =========================================================
+# 2) Build gene-centric expression dataframe
+# =========================================================
+df_mrna_seq_indexed = set_expression_matrix_index(df_mrna_seq.copy())
+
+sample_cols = [c for c in df_mrna_seq.columns if c not in ["Hugo_Symbol", "Entrez_Gene_Id"]]
+
+df_gene_expr_by_sample = (
+    df_mrna_seq_indexed[sample_cols]
+    .apply(pd.to_numeric, errors="coerce")
+    .copy()
+)
+
+df_gene_expr_by_sample_log1p = np.log1p(df_gene_expr_by_sample)
+
+
+# =========================================================
+# 3) Gene metadata
+# =========================================================
+df_gene_meta = (
+    df_mrna_seq_indexed
+    .copy()
+)
+
+
+# =========================================================
+# 4) Sample metadata
+# =========================================================
+df_sample_meta = (
+    df_clinical_samples[["SAMPLE_ID", "PATIENT_ID"]]
+    .merge(
+        df_clinical_patients[["PATIENT_ID", "SUBTYPE"]],
+        on="PATIENT_ID",
+        how="left"
+    )
+    .copy()
+)
+
+df_sample_meta["SUBTYPE"] = df_sample_meta["SUBTYPE"].fillna("NA")
+df_sample_meta = df_sample_meta.set_index("SAMPLE_ID", drop=True)
+
+
+# =========================================================
+# 5) Align gene-expression columns to known samples
+# =========================================================
+sample_cols_in_both = [c for c in df_gene_expr_by_sample.columns if c in df_sample_meta.index]
+
+df_gene_expr_by_sample = df_gene_expr_by_sample[sample_cols_in_both]
+df_gene_expr_by_sample_log1p = df_gene_expr_by_sample_log1p[sample_cols_in_both]
+
+
+# =========================================================
+# 6) Sample-centric expression dataframes
+# =========================================================
+df_sample_expr_by_gene = df_gene_expr_by_sample.T.copy()
+df_sample_expr_by_gene_log1p = df_gene_expr_by_sample_log1p.T.copy()
+
+df_sample_expr_by_gene.index.name = "SAMPLE_ID"
+df_sample_expr_by_gene_log1p.index.name = "SAMPLE_ID"
+
+
+# =========================================================
+# 7) Sample metadata + gene expression combined
+# =========================================================
+common_samples = df_sample_meta.index.intersection(df_sample_expr_by_gene.index)
+
+df_sample_meta_aligned = df_sample_meta.loc[common_samples].copy()
+df_sample_expr_by_gene_aligned = df_sample_expr_by_gene.loc[common_samples].copy()
+
+# Promote metadata columns to 3-level MultiIndex
+df_sample_meta_aligned.columns = pd.MultiIndex.from_tuples(
+    [("sample_meta", col, "") for col in df_sample_meta_aligned.columns],
+    names=["row_id", "Hugo_Symbol", "Entrez_Gene_Id"]
+)
+
+# Ensure gene columns are also a named MultiIndex
+df_sample_expr_by_gene_aligned.columns = pd.MultiIndex.from_tuples(
+    [(str(a), str(b), str(c)) for a, b, c in df_sample_expr_by_gene_aligned.columns],
+    names=["row_id", "Hugo_Symbol", "Entrez_Gene_Id"]
+)
+
+df_sample_expr__gene_expr = pd.concat(
+    [df_sample_meta_aligned, df_sample_expr_by_gene_aligned],
+    axis=1
+)
+
+
+# =========================================================
+# 8) Optional checks
+# =========================================================
+print("df_gene_meta:", df_gene_meta.shape)
+print("df_sample_meta:", df_sample_meta.shape)
+
+print("df_gene_expr_by_sample:", df_gene_expr_by_sample.shape)
+print("df_gene_expr_by_sample_log1p:", df_gene_expr_by_sample_log1p.shape)
+
+print("df_sample_expr_by_gene:", df_sample_expr_by_gene.shape)
+print("df_sample_expr_by_gene_log1p:", df_sample_expr_by_gene_log1p.shape)
+
+print("df_sample_expr__gene_expr:", df_sample_expr__gene_expr.shape)
+
+print("\nSubtype frequencies:")
+print(df_sample_meta["SUBTYPE"].value_counts(dropna=False))
+
+```
+
+
+#### Continuing with other stuff 
+
+```{python}
+meta_cols = ["Entrez_Gene_Id", "Hugo_Symbol"]
+
+# We remove the non-sample columns, for now
+X = df_mrna_seq.copy().drop(columns=meta_cols)
+X
+X.describe()
+```
+```{python}
+# Sneaky Sneaky ... we're using T for transpose and bringing it back
+gene_distribution = X.T.describe().T
+gene_distribution
+```
+```{python}
+# Let's sort by variability
+gene_distribution = gene_distribution.sort_values("std", ascending=False)
+gene_distribution
+```
+
+
+
+
+```{python}
+plt.hist(gene_distribution["std"])
+plt.xlabel("Standard deviation across samples")
+plt.ylabel("Number of genes")
+plt.title("Distribution of gene variability")
+plt.show()
+```
+
+```{python}
+plt.hist(gene_distribution["std"])
+plt.yscale("log")
+plt.xlabel("Standard deviation across samples")
+plt.ylabel("Number of genes")
+plt.title("Distribution of gene variability")
+plt.show()
+```
+
+```{python}
+top_genes = gene_distribution.head(100).index
+bottom_genes = gene_distribution.tail(100).index
+remaining = gene_distribution.iloc[100:-100].index
+random_genes = np.random.choice(remaining, 100, replace=False)
+
+selected_genes = list(top_genes) + list(bottom_genes) + list(random_genes)
+len(selected_genes)
+```
+
+```{python}
+subset = X.loc[selected_genes].T
+
+subset.boxplot(rot=90)
+plt.title("Gene expression distribution: top 100, bottom 100, random 100")
+plt.ylabel("expression")
+plt.show()
+```
+
+
+
+```{python}
+# Variability vector
+gene_std = X.std(axis=1)
+
+# Histogram
+plt.hist(gene_std)
+plt.xlabel("Gene expression standard deviation")
+plt.ylabel("Number of genes")
+plt.title("Distribution of gene variability")
+plt.show()
+```
+
+
+
+
+
+
+
+## Dimension Reduction
+
+```{ojs}
+//| label: section-div-05
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div">Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div class="current">Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+
+
+
+## Statistical Modelling
+
+```{ojs}
+//| label: section-div-06
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div class="current">Statistical Modelling</div>
+  <div>Conclusions</div>
+</div>
+`
+ 
+```
+
+## Conclusions
+
+```{ojs}
+//| label: section-div-07
+//| column: screen
+//| echo: False
+
+html`
+<div class="section-div">
+  <div>Setup</div>
+  <div>Data Acquisition</div>
+  <div>Data Understanding</div>
+  <div>Data Cleaning</div>
+  <div>Dimension Reduction</div>
+  <div>Statistical Modelling</div>
+  <div class="current">Conclusions</div>
+</div>
+`
+ 
+```
+
+## Other stuff
+
+```{python}
+%matplotlib inline
+def upper_quartile_nonzero(x: pd.Series, q: float = 0.75) -> float:
+    """Upper quartile excluding zeros/NaNs. Returns NaN if too few nonzero values."""
+    v = x.to_numpy(dtype=float)
+    v = v[np.isfinite(v)]
+    v = v[v > 0]
+    if v.size < 10:
+        return np.nan
+    return float(np.quantile(v, q))
+
+df = df_mrna_seq.copy()
+
+# 1) Put gene identifiers in the index (optional but nice)
+df = df.set_index(["Hugo_Symbol", "Entrez_Gene_Id"])
+
+# 2) Sample columns are now all remaining columns
+sample_cols = df.columns
+
+# 3) Coerce sample data to numeric (handles strings/object dtype safely)
+X = df.apply(pd.to_numeric, errors="coerce")  # same shape as df, but numeric/NaN
+
+# Helper: get nonzero values from one sample column
+def nonzero_vals(col: pd.Series):
+    v = col.dropna()
+    v = v[v > 0]
+    return v.values
+
+uq = X.apply(lambda s: np.quantile(nonzero_vals(s), 0.75) if nonzero_vals(s).size else np.nan, axis=0)
+```
+
+
+## Density overlays with quantiles
+```{python}
+#| eval: false
+#| output: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+
+# df: genes x samples, UQ-normalized values
+# one column = one sample
+
+# -----------------------------
+# piecewise transform functions
+# -----------------------------
+def forward_transform(x, x_break=1000.0, xmax=None, left_frac=0.75):
+    """
+    Map data x to display coordinate t in [0, 1].
+
+    [0, x_break]      -> [0, left_frac]
+    [x_break, xmax]   -> [left_frac, 1]
+    """
+    x = np.asarray(x, dtype=float)
+    if xmax is None:
+        raise ValueError("xmax must be provided")
+
+    t = np.empty_like(x)
+
+    left = x <= x_break
+    right = ~left
+
+    # first segment
+    t[left] = left_frac * (x[left] / x_break)
+
+    # second segment
+    if xmax <= x_break:
+        t[right] = left_frac
+    else:
+        t[right] = left_frac + (1 - left_frac) * (x[right] - x_break) / (xmax - x_break)
+
+    return t
+
+
+def inverse_transform(t, x_break=1000.0, xmax=None, left_frac=0.75):
+    """
+    Inverse map from display coordinate t in [0, 1] back to data x.
+    """
+    t = np.asarray(t, dtype=float)
+    if xmax is None:
+        raise ValueError("xmax must be provided")
+
+    x = np.empty_like(t)
+
+    left = t <= left_frac
+    right = ~left
+
+    x[left] = x_break * (t[left] / left_frac)
+
+    if xmax <= x_break:
+        x[right] = x_break
+    else:
+        x[right] = x_break + (xmax - x_break) * (t[right] - left_frac) / (1 - left_frac)
+
+    return x
+
+
+# -----------------------------------
+# one density overlay plot for samples
+# -----------------------------------
+def density_overlay_piecewise_axis(
+    df,
+    max_samples=None,
+    bandwidth_adjust=1.0,
+    x_break=1000.0,
+    left_frac=0.75,
+    figsize=(10, 6)
+):
+    samples = df.columns if max_samples is None else df.columns[:max_samples]
+
+    # use positive values only for KDE
+    positive_max = df[df > 0].max().max()
+    xmax = float(positive_max) * 1.05
+
+    # grid in original data units
+    x_grid = np.linspace(0, xmax, 800)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for s in samples:
+        vals = df[s].to_numpy()
+        vals = vals[vals > 0]
+
+        if len(vals) < 2 or len(np.unique(vals)) < 2:
+            continue
+
+        kde = gaussian_kde(vals)
+        kde.set_bandwidth(kde.factor * bandwidth_adjust)
+        y = kde(x_grid)
+
+        # normalize each curve for visibility
+        # y = y / y.max()
+
+        # transform x for plotting
+        t_grid = forward_transform(x_grid, x_break=x_break, xmax=xmax, left_frac=left_frac)
+
+        ax.plot(t_grid, y, alpha=0.15, linewidth=1)
+
+    # mark the 1000 anchor
+    t_break = forward_transform(np.array([x_break]), x_break=x_break, xmax=xmax, left_frac=left_frac)[0]
+    ax.axvline(t_break, linestyle="--", linewidth=2)
+
+    # custom ticks in original units
+    tick_values = np.array([0, 250, 500, 750, 1000, 1500, 2000, 3000, 5000])
+    tick_values = tick_values[tick_values <= xmax]
+    tick_positions = forward_transform(tick_values, x_break=x_break, xmax=xmax, left_frac=left_frac)
+
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels([f"{int(v)}" for v in tick_values])
+
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("UQ-normalized expression")
+    ax.set_ylabel("Scaled density")
+    ax.set_title("Sample density overlays with piecewise x-axis")
+    ax.grid(axis="y", alpha=0.2)
+
+    plt.tight_layout()
+    return fig, ax
+
+
+# Example call:
+# fig, ax = density_overlay_piecewise_axis(df, max_samples=60)
+# plt.show()
+```
+
+```{python}
+#| label: analyze-data-box-plot-builder
+#| eval: false
+#| display: false
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# --------------------------------------------------
+# data: rows = genes, columns = samples
+# --------------------------------------------------
+df = X.copy()
+
+# --------------------------------------------------
+# piecewise continuous transform breakpoints
+# --------------------------------------------------
+xMin = 0.0
+Q3 = 1000.0
+U  = 1500.0
+E  = 2500.0
+xMax = 5000.0
+
+# widths:
+# 0 -> Q3         : 75%
+# Q3 -> U         : 75% of remaining
+# U -> E          : 75% of remaining
+# E -> M          : remainder
+w1 = 0.75
+w2 = 0.75 * (1 - w1)              # 0.1875
+w3 = 0.75 * (1 - w1 - w2)         # 0.046875
+w4 = 1 - w1 - w2 - w3             # 0.015625
+
+def forward_transform(x, Q3=1000.0, U=1500.0, E=2500.0, M=5000.0):
+    x = np.asarray(x, dtype=float)
+    t = np.empty_like(x)
+
+    s1 = x <= Q3
+    s2 = (x > Q3) & (x <= U)
+    s3 = (x > U) & (x <= E)
+    s4 = x > E
+
+    t[s1] = w1 * (x[s1] / Q3)
+    t[s2] = w1 + w2 * (x[s2] - Q3) / (U - Q3)
+    t[s3] = w1 + w2 + w3 * (x[s3] - U) / (E - U)
+    t[s4] = w1 + w2 + w3 + w4 * (x[s4] - E) / (M - E)
+
+    return t
+
+# --------------------------------------------------
+# order samples by median of expressed genes only
+# --------------------------------------------------
+sample_medians = {}
+zero_counts = {}
+
+for s in df.columns:
+    raw = df[s].to_numpy(dtype=float)
+    zero_counts[s] = np.sum(raw == 0)
+
+    vals = raw[np.isfinite(raw) & (raw > 0)]
+    sample_medians[s] = np.median(vals) if len(vals) > 0 else np.nan
+
+sample_medians = dict(sorted(sample_medians.items(), key=lambda kv: kv[1]))
+ordered_samples = list(sample_medians.keys())
+
+# --------------------------------------------------
+# global maximum over expressed genes only
+# --------------------------------------------------
+all_vals = df.to_numpy(dtype=float)
+all_pos = all_vals[np.isfinite(all_vals) & (all_vals > 0)]
+M = float(all_pos.max())
+
+# --------------------------------------------------
+# plot
+# --------------------------------------------------
+n = len(ordered_samples)
+fig_height = max(12, n * 0.20)
+
+fig, axes = plt.subplots(
+    nrows=n,
+    ncols=1,
+    figsize=(10, fig_height),
+    sharex=True
+)
+
+if n == 1:
+    axes = [axes]
+
+for ax, s in zip(axes, ordered_samples):
+    raw = df[s].to_numpy(dtype=float)
+    vals = raw[np.isfinite(raw) & (raw > 0)]
+
+    if len(vals) == 0:
+        continue
+
+    vals_t = forward_transform(vals, Q3=Q3, U=U, E=E, M=M)
+
+    ax.boxplot(
+        vals_t,
+        vert=False,
+        widths=0.6,
+        showfliers=True
+    )
+
+    ax.set_yticks([1])
+    ax.set_yticklabels([f"{s}  (zeros={zero_counts[s]})"], fontsize=7)
+
+    # reference lines
+    for v, ls in [(Q3, "--"), (U, ":"), (E, "-.")]:
+        ax.axvline(
+            forward_transform([v], Q3=Q3, U=U, E=E, M=M)[0],
+            linestyle=ls,
+            linewidth=0.8,
+            alpha=0.7
+        )
+
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.grid(axis="x", alpha=0.2)
+
+# --------------------------------------------------
+# custom ticks in original units
+# --------------------------------------------------
+tick_vals = np.array([0, 250, 500, 750, 1000, 1500, 2500], dtype=float)
+tick_pos = forward_transform(tick_vals, Q3=Q3, U=U, E=E, M=M)
+
+axes[-1].set_xticks(tick_pos)
+axes[-1].set_xticklabels([str(int(v)) for v in tick_vals])
+axes[-1].set_xlabel("RSEM UQ expression (expressed genes only; piecewise display scale)")
+
+fig.suptitle(
+    "Samples ordered by median expressed-gene expression\n"
+    "Zeros removed for plotting; zero counts shown in labels",
+    y=0.999
+)
+
+plt.tight_layout()
+plt.show()
+```
+
+
+## Looking at some data
+### Upper quartile per sample
+
+```{python}
+plt.figure(figsize=(6,4))
+plt.hist(uq.dropna().values, bins=40)
+plt.title("Per-sample Upper Quartile (75th percentile, nonzero)")
+plt.xlabel("UQ value")
+plt.ylabel("Number of samples")
+plt.tight_layout()
+plt.show()
+```
+
+### Sorted UQ line plot
+```{python}
+uq_sorted = np.sort(uq.dropna().values)
+
+plt.figure(figsize=(6,4))
+plt.plot(uq_sorted)
+plt.title("Sorted per-sample UQ values")
+plt.xlabel("Samples (sorted)")
+plt.ylabel("UQ value")
+plt.tight_layout()
+plt.show()
+```
+
+
+### Compare distributions across some samples (log10)
+```{python}
+chosen = list(sample_cols[:8])  # pick any 8 you want
+
+plt.figure(figsize=(8,5))
+for col in chosen:
+    v = nonzero_vals(X[col])
+    if v.size == 0:
+        continue
+    plt.hist(np.log10(v), bins=60, alpha=0.3)
+
+plt.title("log10(Expression) distributions (selected samples)")
+plt.xlabel("log10(expression)")
+plt.ylabel("Frequency")
+plt.tight_layout()
+plt.show()
+```
+
+### Coefficient of variation
+```{python}
+uq_clean = uq.dropna()
+cv = uq_clean.std() / uq_clean.mean()
+cv
+```
+
+
+## Exploration
+
+
+1. Isolate
+   1. Tumor Sample --> RNA
+   2. We isolate all the RNA
+2. Fragment
+   1. Isolated RNA --> 
+
+We take our tumor sample and isolate all of the RNA (or poly-A selected mRNA)
+turn Mature mRNA into RNA fragments, in a process called fragmentation.
+Then, with turn those RNA fragments into cDNA fragments, in a process called reverse transcription.
+This all goes into a High-throughput sequencing machine to give us sequences/reads of every fragment. This will be an ordered list of the chemicals (A C G T) ?? Do we read the RNA or the c-DNA strand
+
+Major Data Point 1: We now have a count of all the fragments (and what they are)
+
+All of these reads need to get aligned back to the original gene.
+
+### Problems
+- Different versions of Mature mRNA (which are referred to as an "isoform") can happen because of an issue during the processing from Pre-mRNA to Mature mRNA including:
+  - Alternative transcript initiation
+  - Alternative 5' splice site
+  - Altertiave 3' splice site
+  - Skipped exon
+  - Alternative polyadenylation
+  - ... others
+- It is expensive and takes a long time to do really long reads (e.g., the whole gene), which is why we need to fragment the mRNA into smaller pieces.
+  - This means that we might not always capture all the different isoforms.
+- Fragments might align to more than one isoform, or to a different gene.
+
+### Goal
+**Expression Analysis**, estimate a transcriptome, the set of all expressed transcripts and their frequencies in a cell at a given time. 
+
+- We can measure/calculate the relative expression (i.e., frequency) of two things in our sample:
+  - Transcripts (i.e., What proportion of the sample was expressed by a specific isoform, by transcripts?)
+    - e.g., There are a total of 100 transcripts in the whole sample. Isoform AAA1 was expressed by 88 of them.
+  - Nucleotides (i.e., What proportion of the sample was expressed by a specific isoform, by nucleotides?)
+    - e.g., There are a total of 1,000,000 nucleotides in the whole sample. Isoform BBB2 was expressed by 500,000 of them.
+
+### Somethingsomething
+
+Definitions
+All definitions are framed for cBioPortal, the software system (which includes a website, and database) for interactive exploration of multidimensional cancer genomics data sets.
+
+TCGA
+: The Cancer Genome Atlas, a project that profiles specific cancer types to understand their individual molecular landscape.
+
+PanCanAtlas
+: a Pan-Cancer Initiative that took all 33 TCGA cancer types and analyzed them together to compare molecular similarities and differences.
+
+Study
+: Often identified by its acronym (e.g., TCGA-LGG) represents the specific tumour cohort that was analyzed.
+
+Ontology
+: a set of concepts and categories in a subject area or domain that shows their properties and the relations between them
+
+OncoTree
+: the cancer type ontology used by cBioPortal, which has has a root node of Tissue, so Level 1 would be all the Tissue Sites, then they are categorized by cancer types.
+
+cBioPortal Data Model
+
+Database
+Studies
+Clinical Data
+Samples
+Sample Lists
+Patients
+Namespace Attributes
+Mutations
+Molecular Data
+Gene Panel Data
+Discrete Copy Number Alterations
+Molecular Profiles
+Genes
+Generic Assays
+Generic Assay Data
+Gene Panels
+Copy Number Segments
+Clinical Attributes
+Cancer Types
+
+
+
+
+Database, the 
+Dataset, the set of files for a particular study
+Data Type: Clinical
+Data Type: Molecular
+Sequencing
+RNA Sequencing
+RSEM
+
+
+RSEM defines the following; 
+
+For isoform $i$, 
+$\nu_i$, the fraction of nucleotides made up by a given gene or isoform
+$$
+\nu_i = \frac{\tau_i\ell_i}{\sum_j\tau_j\ell_j}
+$$
+
+$\tau_i$, the fraction of transcripts made up by a given gene or isoform
+$$
+\tau_i = \frac{\nu_i}{\ell_i}\left(\sum_j\frac{\nu_j}{\ell_j}\right)^{-1}
+$$
+
+where $\ell_i$ is the length, in nucleotides, of isoform $i$. 
+
+ 
+The probability that the read sequence
+$$
+P(r|\theta) = \prod_{n=1}^N\sum_{i=0}^M\theta_i P(r_n|G_n=i)
+$$
+
+
+
+
+
+EM Algorithm
+- An iterative method to find (local) maximum likelihood estimates of parameters in statistical models, where the model depends on unobserved latent variables. 
+
+RSEM Model
+- Generates reads from a combination of isoform, start position, and orientation
+- $N$ the number of reads generated (independent and identically distributed)
+  - i.i.d is an assumption that is supported by uniform sampling, massive parallelization and high depth, random fragmentation, poisson/negative binomial approximation accounting for dispersion
+  - i.i.d. for rna-seq is rarely perfect, but is helpful for when we do differential expression analysis
+- $L$ the length of reads
+- Random Variables
+  - $R_n$, read sequences (i.e., observed data)
+- Latent Random Variables
+  - $G_n$, isoform (from which the read came from)
+  - $S_n$, start position (from which the read came from)
+  - $O_n$, orientation (from which the read came from)
+- Parameters
+  - $\theta = [\theta_0, ... , \theta_M]$, the expression levels
+    - We assume $M$, all possible isoforms in a transcriptome, is given
+
+
+More Details
+- $G_n \in \{0, ..., M\}$, where $0$ represents a 'noise' isoform, which generates reads that do not map to known isoforms.
+  - The probability of any given isoform is determined when the expression levels for that isoform equals 1. 
+  - $P(G_n=i | \theta) = \theta_i \text{  where  } \sum_i\theta_i = 1$
+- $S_n \in \{1, ..., \text{max}_i\ell_i}$, where $\ell_i$ is the length of isoform $i$
+  - $P(S_{n=j} | G_{n=i})$ is called the *read start position distribution* (RPSD)
+  - $P(S_{n=j} | G_{n=i}) = \ell^{-1}_i$, for reads generated uniformly across transcripts and mRNA with poly(A) tails
+    - The other models are not shown, because the important part is the relationship with length
+- $O_n \in \{0, 1\}$
+  - 0 indicating that the sequence of read n is in the same orientation as that of its parent isoform
+  - 1 indicating thet the sequence of read n is the reverse complement of its parent isoform
+- $R_n$ summarizes the hidden random variables for the $n$-th read with a set of indicator random variables
+  - $Z_{nijk} \text{  where  } Z_{njk} = 1 \text{ if } (G_n, S_n, O_n) = (i, j, k)$
+  - Therefore, the conditional probability of a read sequence derived from an isoform (other than the noise isoform) is given by
+
+$$
+P(R_n = \rho | Z_{njk} = 1) = \begin{cases}
+    \prod_{t=1}^L w_t(\rho_t , \gamma_{j+t-1}^i) \qquad k=0 \\
+    \prod_{t=1}^L w_t(\rho_t , \bar{\gamma}_{j+t-1}^i) \qquad k=1
+\end{cases}
+$$
+
+  - $\gamma^i$ is the sequence of the isoform $i$ and $\bar{\gamma}^i$ is its reverse complement
+  - $w_t(a,b)$ is a position-specific substitution matrix, where the value is the probability that we observe character $a$ as position $t$ of the read given that the corresponding character in the reference isoform sequence is $b$
+
+
+
+
+
+
+
+
+
+Expresseions at the gene level is simply the sum of the expression of possible isoforms. 
+
+NOTE: There is some really interesting Maths regarding the RSEM algorithm alternating between the E-step and the M-step that results in the concavity of the log likelihood function (i.e., guaranteed to reach a global maximum). 
+
+
+What the bloody hell does this even mean?
+
+We're looking at "genes.normalized_results" so it's going to be the sum of isoforms
+
+- RNASeqV2 = Processed using RSEM (RNA-Seq by Expectation-Maximization)
+  - Specifically data_mrna_seq_v2_rsem.txt = to the rsem.genes.normalized_results file from TCGA
+- RSEM calculates the estimated number of reads that aligned to a transcript (i.e., relative expression)
+  - **fraction of transcripts**
+  - **fraction of nucleotides**
+
+What do the numbers in data_mrna_seq_v2_rsem.txt mean? 
+```{python}
+1
+```
+
+
+🧬 From Shredded Spells to Gene Expression
+==========================================
+
+What We Actually Measured
+-------------------------
+
+### 🔍 The Crime Scene (Biological Reality)
+
+-   Tumor tissue contains RNA.
+
+-   RNA represents **which genes are actively being used**.
+
+-   We sequence millions of short fragments (reads).
+
+-   Each read is a tiny piece of a transcript.
+
+* * * * *
+
+📖 The Reconstruction
+---------------------
+
+We assume all fragments came from a known reference "book" (the human transcriptome).
+
+Using **RSEM (RNA-Seq by Expectation Maximization)**:
+
+-   Reads are probabilistically assigned to transcript isoforms.
+
+-   Isoform estimates are aggregated to gene-level estimates.
+
+-   Values are corrected for:
+
+    -   Gene length
+
+    -   Sequencing depth
+
+    -   Multi-mapping reads
+
+The result:
+
+> A gene-by-sample matrix of estimated transcript abundance.
+
+* * * * *
+
+📊 What Each Row Represents
+---------------------------
+
+**Hugo_Symbol**\
+The official gene name (e.g., TP53, IDH1).
+
+**Entrez_Gene_Id**\
+Stable numeric gene identifier (database key).
+
+Each row = one gene.\
+Each column = one tumor sample.\
+Each value = estimated mRNA abundance for that gene in that tumor.
+
+* * * * *
+
+📈 What the Numbers Mean
+------------------------
+
+-   Continuous
+
+-   Non-negative
+
+-   Linear RSEM abundance estimates
+
+-   Proportional to transcript abundance
+
+-   Not raw molecule counts
+
+-   Not mutation data
+
+-   Not protein levels
+
+If Gene A = 200 and Gene B = 100 (within a sample):
+
+→ Gene A has approximately twice the estimated transcript abundance of Gene B.
+
+But:
+
+Magnitude ≠ importance.
+
+* * * * *
+
+🧠 What Matters Most
+--------------------
+
+### 1️⃣ Same Gene Across Samples
+
+Biologically meaningful comparison.
+
+### 2️⃣ Variability Across Tumors
+
+High variance genes → informative\
+Low variance genes → housekeeping / background
+
+### 3️⃣ Expression ≠ Genome
+
+We measured gene **expression**, not gene presence or mutation.
+
+* * * * *
+
+🧬 Key Vocabulary
+-----------------
+
+-   **Gene** -- DNA locus that produces RNA.
+
+-   **Isoform** -- Alternative transcript version of a gene.
+
+-   **Transcriptome** -- Total RNA expression profile of a sample.
+
+-   **RSEM** -- Probabilistic transcript quantification method.
+
+-   **Expected Counts** -- Model-based abundance estimates.
+
+-   **Normalization** -- Adjusting for technical bias (not biological baseline).
+
+-   **Variance** -- Spread across samples; often more informative than raw magnitude.
+
+* * * * *
+
+🎭 The Big Insight
+------------------
+
+Each tumor is not just a disease.
+
+It is:
+
+> A 20,531-dimensional expression profile\
+> describing which biological programs are active.
+
+We reconstructed the "spellbook."
+
+But the real story lives in:
+
+-   Which chapters change.
+
+-   Which remain constant.
+
+-   And how patterns emerge across tumors.
+
+* * * * *
+
+⚠️ The Important Limitation
+---------------------------
+
+Expression data tells us:
+
+-   What instructions are active.
+
+It does NOT tell us:
+
+-   Why they're active.
+
+-   Whether they're mutated.
+
+-   Whether protein levels match.
+
+-   Whether the change is causal.
+
+This is one layer of biology.
+
+* * * * *
+
+🔥 Final Line for Class
+-----------------------
+
+> "We didn't count genes.\
+> We counted how loudly each gene was being read.\
+> And in that noise... the pattern begins to whisper."
+
+
+
+
+I'm trying to focus on simplifying and understanding sequencing for the cancer data project. 
+
+In the readme for one of the TCGA Pancan datasets, is something saying Tumor Break Load: 
+ - TBL scores based on Lakbir et al., 2024 (Manuscript in progress)
+ - Overview of TBL calculation for TCGA, from [Lakbir et al., Eur J Cancer 2024](https://pubmed.ncbi.nlm.nih.gov/36334560/)
+ - Data is provided as a sample-level clinical attribute labeled `Tumor Break Load`
+
+... Is this relevant to what I want to know ... which is .... 
+First, what I think I understand: 
+
+We have a study (e.g. TCGA-LGG) that focuses on the particular cancer (CNV/Brain: LGG), which has some patients, who had a sample of the cancer taken. 
+That sample then went through a process which ended up in some data. 
+
+The lab stuff, I don't need to know (at least not details). In the end ... basically we have something that goes into a "Illumina HiSeq 2000 RNA Sequencing Version 2 analysis" - which is the name of a machine, and a particular set of settings/process used on that machine. 
+
+
+Part 1: Prepare a sequence library
+Steps: 
+1. Isolate the RNA
+2. Break the RNA into small fragments (because RNA transcripts can be very long and the machine can only sequence something short -- not sure how short)
+3. Convert the RNA fragments into double stranded DNA (cDNA?) - because double stranded DNA is more stable than RNA, and it can be easily amplified and modified
+4. Add sequencing adaptors (because two things: 1. Allows the sequencing machine to recognize the fragments, 2. could do many samples at once, with different adaptors)
+   1. Doesn't work 100% of the time
+5. PCR Amplify (not sure what this means or why it's important)
+6. Quality control
+   1. Verify Library concentration
+   2. Verify library fragment lengths
+
+Part 2: Sequence
+1. DNA is vertical, on a grid called a Flow Cell (maybe 400 million fragments are laid out ... is it all of them at once?)
+2. Colour coded (based on nucleotide) Fluorescent probes attach to the first base
+3. Machine takes picture - shows colours
+4. Washes the colours off the probes
+5. Repeats step 2-4 until done
+- Quality scores quantify how confident the machine is that it got the correct base, and some problems that affect this could be:
+  - a probe isn't bright enough, so machine isn't sure of the colour for a specific probe
+  - lots of probes of the same colour in the same region (bigger problem is it happens early in the sequencing) -- called low diversity
+
+THIS IS WHERE THE REAL "RAW" DATA IS
+
+So, a "read" is 4 lines of data: 
+@ Unique ID for the sequence
+Sequences that the machine got
++
+Quality score for each base 
+
+?? Maybe a typical sequence run with 400 million reads, will generate a file with 1.6 billion lines of data 
+
+Part 3: Data Stuff?? (Not data analysis, per se ... more like preparing to give stuff for data analysis??) -- I'm pretty sure this is NOT part of the actual machine ... what we get from the machine is the raw data. Then we get into some basic data prep/cleansing  ... alignment to a genome ... counting the number of reads per gene (which includes or also has standardization/normalization).... 
+
+1. Filter out garbage reads
+   1. garbage reads are those with low quality base calls, reads that are clearly artifacts of the chemistry (e.g., adapters binded to each other, so the read is just adapter sequence)
+2. Align the high quality reads to a genome
+   1. We start with a genome (for us it's the human genome)
+   2. It gets split into small fragments 
+      1. This is because it allows us to align reads even if they are not exact matches to the reference genome; because genomes are not identical across the population
+   3. Fragments / Locations are indexed
+   4. Match read fragments to the genome fragments / locations
+      1. Genome fragments that match read fragments determine the location of the genome (chromosome/position)
+3. Count the number of reads per gene
+   1. Now we have chromosome/position for a read - we check if it falls within the coordinate of a gene (or another interesting feature)
+
+BAM - now we have a matrix of numbers: Rows are 1 per Gene, columns are samples, and values are the raw counts. 
+
+
+Not sure if we're doing "bulk" RNA-seq or "single-cell" RNA sequencing. 
+
+NOW ... data normalization ... Because samples might have a different number of reads (could be because of quality or concentration of flow cell)
+
+And ... this is when we get into RSEM... 
+
+
+
+
+So ... Am I correct or wrong? 
+
+
+
+digraph BioHybrid {
+    rankdir=LR;
+    node [fontname="Arial", fontsize=10];
+    edge [fontname="Arial", fontsize=9, color="#2c3e50", fontcolor="#2c3e50"];
+
+    // Material Style: A clean "Badge" look
+    node [shape=plaintext];
+
+    tumour [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2c3e50">
+            <TR><TD BGCOLOR="#34495e"><FONT COLOR="white"><B>Tumor Sample</B></FONT></TD></TR>
+            <TR><TD>250 mg</TD></TR>
+        </TABLE>>];
+
+    rna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#27ae60">
+            <TR><TD BGCOLOR="#2ecc71"><FONT COLOR="white"><B>Total RNA</B></FONT></TD></TR>
+            <TR><TD>1-5 µg</TD></TR>
+        </TABLE>>];
+
+    mrna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2980b9">
+            <TR><TD BGCOLOR="#3498db"><FONT COLOR="white"><B>mRNA</B></FONT></TD></TR>
+            <TR><TD>1-5% of Total</TD></TR>
+        </TABLE>>];
+
+    cdna [label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#8e44ad">
+            <TR><TD BGCOLOR="#9b59b6"><FONT COLOR="white"><B>cDNA Library</B></FONT></TD></TR>
+            <TR><TD>Ready for Seq</TD></TR>
+        </TABLE>>];
+
+    // Edges with Process Labels
+    // Using 'labeldistance' or just simple labels
+    tumour -> rna [label="  Isolation  ", penwidth=2];
+    rna -> mrna [label="  Enrichment  ", penwidth=2];
+    mrna -> cdna [label="  Reverse Transcription\n+ Library Prep  ", penwidth=2];
+}
+
+## New Grid for things
+
+```{ojs}
+ag = require("https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js")
+
+gridOptions = ({
+  rowData: [
+    { make: "Tesla", model: "Model Y", price: 64950, electric: true },
+    { make: "Ford", model: "F-Series", price: 33850, electric: false },
+    { make: "Toyota", model: "Corolla", price: 29600, electric: false },
+    { make: "Mercedes", model: "EQA", price: 48890, electric: true },
+    { make: "Fiat", model: "500", price: 15774, electric: false },
+    { make: "Nissan", model: "Juke", price: 20675, electric: false }
+  ],
+  columnDefs: [
+    { field: "make" },
+    { field: "model" },
+    { field: "price" },
+    { field: "electric" }
+  ]
+})
+
+gridApi = ag.createGrid(myGrid, gridOptions)
+gridApi
+```
+
+
+:::{#myGrid .ag-theme-quartz style="height: 500px;"}
+
+:::
+
+
+
+
+
+
+
