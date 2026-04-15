@@ -5,7 +5,7 @@ project:
     port: 4200
     browser: true
   render:
-    - index_final_pass2.qmd
+    - index_cleaned.qmd
 
 website:
   site-url: https://bijans-projects.github.io/genomics-data-mining
@@ -17,12 +17,12 @@ website:
     type: overlay
   page-footer:
     left: |
-      Genomics Data Mining final project site
-  title: "Genomics Data Mining"
+      Made up
+  title: "Bijans Projects"
   reader-mode: true
   navbar:
     left:
-      - index_final_pass2.qmd
+      - index_cleaned.qmd
     tools:
       - icon: github
         href: https://github.com/Bijans-Projects

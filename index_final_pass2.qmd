@@ -101,16 +101,9 @@ The conclusions are properties of the entire pipeline, not just the data.
 
 When our data has a lot of dimensions, and the relationships between them is complex, are our conclusions true to the underlying structure or consequences of our pipeline/decisions?
 
-In order to compare if these decisions resulted in different conclusions, we will consider gene expression in determening cancer subtype (i.e., classification) under different pipeline decisions, using Accuracy.
-For example: 
+To study whether preprocessing and modelling choices materially change downstream conclusions, we use gene-expression data to predict cancer subtype under a fixed sequence of analytical steps. The emphasis is not on claiming a single universally optimal pipeline, but on showing that high-dimensional conclusions depend on the combined set of preprocessing, transformation, and modelling decisions.
 
-Pipeline 1: 
-- Data cleansing: Removed all genes with a gene expression < 30
-- Dimensional Reduction: PCA (50 components)
-
-Once classification has been done, we will compare the results over many repeated trials (?? are these methods deterministic - I don't think so ). 
-
-TODO: Investigate if paired design makes sense. PRoblem: simple splits are simple. But the comparisons grow exponentially (2^n, where n is every time we have a difference)
+For the modelling demonstration in this document, we use a clean train/test workflow with dimensional reduction and multinomial classification, then summarize predictive performance using held-out accuracy and misclassification patterns. Random components are controlled with explicit seeds where applicable.
 
 
 
@@ -195,27 +188,6 @@ TODO: Investigate if paired design makes sense. PRoblem: simple splits are simpl
 
 
 ## Setup
-
-```{ojs}
-//| label: section-div-01
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div class="current">Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Exploratory Analysis</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div>Validation</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
 
 Establishing a reproducible analysis environment.
 
@@ -1778,25 +1750,6 @@ else:
 
 ## Data Acquisition
 
-```{ojs}
-//| label: section-div-02
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div class="current">Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
-
 We use the cBioPortal to gather data about what is available. 
 
 ### cBioPortal
@@ -2034,27 +1987,6 @@ itables.show(described_df_mrna_seq)
 
 ## Data Understanding
 
-```{ojs}
-//| label: section-div-03
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div class="current">Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Exploratory Analysis</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div>Validation</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
-
 ### Review
 1. Cancer is a disease of altered cellular behaviour
 2. Cellular behaviour is driven by proteins
@@ -2106,7 +2038,7 @@ Output: Counts of fragments to transcripts
 Each number represents a gene's relative expression level. We can compare both across the samples, and across genes. 
 
 
-## Upper Quartile (UQ) Normalization — Inspection
+### Upper Quartile (UQ) Normalization — Inspection
 
 Upper Quartile normalization rescales each sample so that the **75th percentile of expression values is aligned across samples**.
 
@@ -2116,7 +2048,7 @@ If the data are already UQ-normalized, we expect:
 - Expression distributions to be roughly aligned (on a log scale).
 - Low variability in the per-sample UQ values.
 
-### Compute the Upper Quartile per Sample
+#### Compute the Upper Quartile per Sample
 
 ```{python}
 # --- Build a numeric matrix X with samples in columns ---
@@ -2150,7 +2082,7 @@ uq = X.apply(uq_nonzero, axis=0)
 uq
 ```
 
-### Distribution of UQ Across Samples
+#### Distribution of UQ Across Samples
 
 ```{python}
 plt.figure(figsize=(6,4))
@@ -2162,12 +2094,12 @@ plt.tight_layout()
 plt.show()
 ```
 
-#### Interpretation
+##### Interpretation
 If the data are properly UQ-normalized:
 - The histogram should be tightly concentrated
 - Large spread would indicate remaining library-size differences
 
-### Sorted UQ Values
+#### Sorted UQ Values
 
 ```{python}
 uq_sorted = np.sort(uq.dropna().values)
@@ -2182,11 +2114,11 @@ plt.tight_layout()
 plt.show()
 ```
 
-#### Interpretation
+##### Interpretation
 - A nearly flat line indicated consistent normalization
 - A steep slope suggests uneven scaling across samples
 
-### Expression Distribution Comparison (log scale)
+#### Expression Distribution Comparison (log scale)
 We compare a subset of samples to inspect distribution alignment
 
 ```{python}
@@ -2207,13 +2139,13 @@ plt.tight_layout()
 plt.show()
 ```
 
-#### Interpretation
+##### Interpretation
 After UQ normalization
 - Distributions should overlap substantially
 - Major horizontal shifts would suggest remaining depth differences
 - Perfect overlap is not expected (i.e., biological variation remains)
 
-### Coefficient of Variation of UQ
+#### Coefficient of Variation of UQ
 
 ```{python}
 uq_clean = uq.dropna()
@@ -2225,39 +2157,13 @@ The coefficient of variation summarized how tightly aligned the UQ values are
 - Small: strong normalization consistency
 - Large: residual scaling differences
 
-
-
 Overall UQ normalization: 
 - Corrects multiplicative library-size effects
 - Anchors the 75th percentile expression level
 - Assumes most genes are not dramatically differntially expressed
 - Does not remove biological variation
 
-
-
-
-
-
 ## Data Cleaning
-
-```{ojs}
-//| label: section-div-04
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div class="current">Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
 
 cBioPortal already does some cleaning for us, and we need to understand what the baseline state of their data is (which we investigated during previous sections). 
 
@@ -3475,133 +3381,6 @@ def get_db_cursor(portal_properties: PortalProperties):
 
 ```
 
-
-```{python}
-
-## TODO: DELETE, just for simple typing
-df = df_mrna_seq
-df
-```
-
-```{python}
-
-## TODO: This is what we'll eventually use
-# df_mrna_seq_entrez_only = df_mrna_seq
-# df_mrna_seq_entrez_only = df_mrna_seq_entrez_only.drop(columns="Hugo_Symbol")
-# df_mrna_seq_entrez_only.set_index('Entrez_Gene_Id')
-
-# total_rows = df_mrna_seq_entrez_only.shape[0]
-# total_cols = df_mrna_seq_entrez_only.shape[1]
-
-## just for simplicity in typing
-## df = df_mrna_seq_entrez_only
-
-# 1. Check the Entrez Gene Id and Hugo Symbol columns: Must be unique
-
-print(len(df['Entrez_Gene_Id'].unique()))           # <1>
-print(len(df['Hugo_Symbol'].unique()))              # <1>
-
-## THEY ARE NOT UNIQUE ... let's investigate
-
-```
-1. Expected count of unique values = total_rows
-
-
-
-
-
-```{python}
-########## Duplicated Entrez ##########
-df = df_mrna_seq
-duplicated_entrez = df[df.duplicated(subset=['Entrez_Gene_Id'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Entrez_Gene_Id')
-duplicated_entrez
-```
-
-```{python}
-duplicated_entrez_distinct_count = duplicated_entrez['Entrez_Gene_Id'].nunique()
-print(f"Number of distinct Entrez Gene Id's: {duplicated_entrez_distinct_count}")
-```
-
-```{python}
-## ^^ We see that an entrez gene id has more than one Hugo symbol ... let's check if the values we get are the same or not
-duplicated_entrez_samples = df.iloc[duplicated_entrez.index,2:].transpose()
-duplicated_entrez_samples
-```
-
-```{python}
-duplicated_entrez_described = df.iloc[duplicated_entrez.index,2:].transpose().describe().transpose()
-duplicated_entrez_described
-```
-
-```{python}
-duplicated_entrez_described = duplicated_entrez.merge(duplicated_entrez_described, left_index=True, right_index=True)
-duplicated_entrez_described
-## OMG ... so ... there's this weird problem ... there are these entrez gene ID's that are the same ... but the hugo are different ... and they show different values (summmary stats) ... apparently GPT is telling me that in the modern world we use the entrez ID and merge the data ... 
-```
-
-```{python}
-
-df = df.set_index("Entrez_Gene_Id")
-df
-```
-```{python}
-duplicated_entrez_samples = df.iloc[duplicated_entrez.index,2:].transpose()
-duplicated_entrez_samples
-```
-
-```{python}
-df = duplicated_entrez_samples
-df
-```
-
-```{python}
-for col_name in dict.fromkeys(df.columns):
-    sub = df.loc[:, df.columns == col_name]
-
-    data = [sub.iloc[:, i].to_numpy(dtype=float) for i in range(sub.shape[1])]
-
-    plt.boxplot(data)
-    plt.title(f"Boxplot for: {col_name}  (repeats: {sub.shape[1]})")
-    plt.xlabel("repeat #")
-    plt.ylabel("value")
-    plt.grid(True, axis="y", alpha=0.3)
-    plt.show()
-
-# plt.boxplot(duplicated_entrez_samples)
-# plt.title("Boxplot")
-# plt.xlabel("x")
-# plt.ylabel("y")
-# plt.grid(True)
-# plt.show()
-
-```
-
-
-
-
-SKIP THIS during presentation ... We're going to explore uniqueness of Hugo, and eventually Hugo && Entrez
-```{python}
-########## Duplicated Hugo ##########
-df = df_mrna_seq
-duplicated_hugo = df[df.duplicated(subset=['Hugo_Symbol'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Hugo_Symbol')
-
-## ^^ We see that an entrez gene id has more than one Hugo symbol ... let's check if the values we get are the same or not
-duplicated_hugo_described = df.iloc[duplicated_hugo.index,2:].transpose().describe().transpose()
-duplicated_hugo_described = duplicated_hugo.merge(duplicated_hugo_described, left_index=True, right_index=True)
-```
-
-Here's the Hugo && Entrez
-```{python}
-########## Duplicated Entrez AND Hugo ##########
-df = df_mrna_seq
-duplicated_entrez_and_hugo = df[df.duplicated(subset=['Entrez_Gene_Id', 'Hugo_Symbol'], keep=False)].loc[:,['Hugo_Symbol', 'Entrez_Gene_Id']].sort_values(by='Entrez_Gene_Id')
-# 
-
-
-```
-
-Start presentation again
-
 ### Gene Expression
 
 Let's take a look at it
@@ -3808,7 +3587,7 @@ X
 X.describe()
 ```
 ```{python}
-# Sneaky Sneaky ... we're using T for transpose and bringing it back
+# Transpose temporarily to compute gene-wise summary statistics, then restore gene-oriented structure
 gene_distribution = X.T.describe().T
 gene_distribution
 ```
@@ -3879,26 +3658,16 @@ plt.show()
 
 ## Dimension Reduction
 
+This section identifies highly variable genes using robust variability measures, then uses principal components to summarize dominant structure in the expression matrix. The dimensional-reduction outputs here are exploratory and descriptive; the predictive PCA used for classification is fit later on the training data only.
+
 ```{python}
-from scipy.stats import median_abs_deviation
-
-
-## Median Absolute Deviation (single gene: ERBB2)
-X = df_gene_expr_by_sample.copy()
-
-# select ERBB2 (handles MultiIndex)
-idx = pd.IndexSlice
-erbb2_df = X.loc[idx[:, ["ERBB2"], :]]
-
-# flatten values
-vals = pd.to_numeric(erbb2_df.to_numpy().ravel(), errors="coerce")
-vals = vals[np.isfinite(vals) & (vals > 0)]
-
-mad_erbb2 = median_abs_deviation(vals, scale="normal")  # scale="normal" is optional
-
-print("ERBB2 MAD:", mad_erbb2)
-```
-```{python}
+#| label: analyze-dimred-mad-pca-overview
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-cap: "PCA views based on genes selected by raw and log-scale MAD, followed by MAD distributions across genes."
+#| fig-width: 12
+#| fig-height: 5
 from scipy.stats import median_abs_deviation
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -4080,6 +3849,13 @@ mRNA expression data are often strongly right-skewed, with a small number of ver
 The explained variance ratio tells us how much of the total variation in the data is captured by each principal component. For example, if PC1 explains 25% of the variation and PC2 explains 12%, then the first two components together summarize 37% of the overall structure in the selected genes.
 
 ```{python}
+#| label: analyze-dimred-scree-cumulative-comparison
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-cap: "Scree plots and cumulative explained-variance plots highlighting three component choices: 2 PCs, the parallel-analysis choice, and the 95% cumulative explained-variance choice."
+#| fig-width: 12
+#| fig-height: 12
 
 X_log = X.loc[top_genes_log].T
 X_log = X_log.apply(pd.to_numeric, errors="coerce")
@@ -4088,76 +3864,166 @@ X_log = np.log1p(X_log)
 scaler_log = StandardScaler()
 X_log_scaled = scaler_log.fit_transform(X_log)
 
-pca_log_n_components = PCA(n_components=514)
+n_components_fit = min(X_log_scaled.shape[0], X_log_scaled.shape[1])
+pca_log_n_components = PCA(n_components=n_components_fit)
 X_pca_log_n_components = pca_log_n_components.fit_transform(X_log_scaled)
 
-print("\nExplained variance ratio (LOG MAD selection):", pca_log_n_components.explained_variance_ratio_)
-print("Total explained by Principal Components (LOG MAD selection):", pca_log_n_components.explained_variance_ratio_.sum())
-
-n_plot = 514
 evr = pca_log_n_components.explained_variance_ratio_
 cum_evr = np.cumsum(evr)
-pcs = np.arange(1, n_plot + 1)
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+# -------------------------------------------------
+# Component choices
+# -------------------------------------------------
+k_min = 2
 
-axes[0].bar(pcs, evr[:n_plot])
-axes[0].set_title("Scree Plot (first 50 PCs)")
-axes[0].set_xlabel("Principal Component")
-axes[0].set_ylabel("Explained Variance Ratio")
-axes[0].grid(alpha=0.2)
-
-axes[1].plot(pcs, cum_evr[:n_plot], marker="o", linewidth=1)
-axes[1].axhline(0.80, linestyle="--", linewidth=1)
-axes[1].axhline(0.90, linestyle="--", linewidth=1)
-axes[1].axhline(0.95, linestyle="--", linewidth=1)
-axes[1].set_title("Cumulative Explained Variance")
-axes[1].set_xlabel("Principal Component")
-axes[1].set_ylabel("Cumulative Explained Variance Ratio")
-axes[1].set_ylim(0, 1.02)
-axes[1].grid(alpha=0.2)
-
-plt.tight_layout()
-plt.show()
-
-def parallel_analysis(X, n_iter=500, percentile=95):
+def parallel_analysis(X, n_iter=500, percentile=95, random_state=42):
+    rng = np.random.default_rng(random_state)
     n, p = X.shape
     n_components = min(n, p)
     rand_eigs = np.zeros((n_iter, n_components))
 
     for i in range(n_iter):
-        X_rand = np.random.normal(size=(n, p))
+        X_rand = rng.normal(size=(n, p))
         pca_rand = PCA(n_components=n_components).fit(X_rand)
         rand_eigs[i, :] = pca_rand.explained_variance_
 
     rand_threshold = np.percentile(rand_eigs, percentile, axis=0)
     return rand_threshold, rand_eigs
 
-
 real_eigs = pca_log_n_components.explained_variance_
-rand_thresh, rand_eigs_all = parallel_analysis(X_log_scaled, n_iter=500, percentile=95)
+rand_thresh, rand_eigs_all = parallel_analysis(
+    X_log_scaled,
+    n_iter=500,
+    percentile=95,
+    random_state=42
+)
 
-k_parallel = np.sum(real_eigs > rand_thresh)
-print("Parallel analysis components:", k_parallel)
+k_parallel = int(np.sum(real_eigs > rand_thresh))
+k_95 = int(np.argmax(cum_evr >= 0.95) + 1)
 
-pcs = np.arange(1, len(real_eigs) + 1)
+print("2 PCs:", k_min)
+print("Parallel analysis PCs:", k_parallel)
+print("95% cumulative explained variance PCs:", k_95)
 
-plt.figure(figsize=(10, 5))
-plt.plot(pcs, real_eigs, marker="o", linewidth=1, label="Real eigenvalues")
-plt.plot(pcs, rand_thresh, marker="o", linewidth=1, label="Random threshold (95th percentile)")
-plt.axvline(k_parallel, linestyle="--", linewidth=1)
-plt.xlabel("Principal Component")
-plt.ylabel("Eigenvalue")
-plt.title("Parallel Analysis")
-plt.grid(alpha=0.2)
-plt.legend()
+# -------------------------------------------------
+# Use the three choices directly
+# Row 1: 2 PCs
+# Row 2: parallel-analysis PCs
+# Row 3: 95% EVR PCs
+# -------------------------------------------------
+k_values = [k_min, k_parallel, k_95]
+row_titles = [
+    f"2 Principal Components",
+    f"{k_parallel} Principal Components",
+    f"{k_95} Principal Components"
+]
+
+max_plot_k = max(k_values)
+pcs = np.arange(1, max_plot_k + 1)
+
+fig, axes = plt.subplots(3, 2, figsize=(12, 12))
+
+green = "green"
+old_color = "lightgrey"
+
+for row_idx, k_current in enumerate(k_values):
+    ax_scree = axes[row_idx, 0]
+    ax_cum = axes[row_idx, 1]
+
+    # ---------------------------------------------
+    # Scree plot
+    # ---------------------------------------------
+    ax_scree.bar(pcs, evr[:max_plot_k])
+
+    # previous selections in grey, current in green
+    for k_prev in k_values[:row_idx]:
+        ax_scree.axvline(
+            k_prev,
+            linestyle="--",
+            linewidth=1.5,
+            color=old_color,
+            label=f"{k_prev} PCs"
+        )
+
+    ax_scree.axvline(
+        k_current,
+        linestyle="--",
+        linewidth=2,
+        color=green,
+        label=f"{k_current} PCs"
+    )
+
+    ax_scree.set_title(f"{row_titles[row_idx]}: Scree Plot")
+    ax_scree.set_xlabel("Principal Component")
+    ax_scree.set_ylabel("Explained Variance Ratio")
+    ax_scree.set_xlim(0.5, max_plot_k + 0.5)
+    ax_scree.grid(alpha=0.2)
+    ax_scree.legend()
+
+    # ---------------------------------------------
+    # Cumulative explained variance
+    # ---------------------------------------------
+    ax_cum.plot(pcs, cum_evr[:max_plot_k], marker="o", linewidth=1)
+
+    # grey previous highlighted points
+    for k_prev in k_values[:row_idx]:
+        prev_idx = np.arange(k_prev)
+        ax_cum.plot(
+            pcs[prev_idx],
+            cum_evr[prev_idx],
+            marker="o",
+            linestyle="None",
+            color=old_color,
+            label=f"First {k_prev} PCs"
+        )
+
+    # green current highlighted points
+    curr_idx = np.arange(k_current)
+    ax_cum.plot(
+        pcs[curr_idx],
+        cum_evr[curr_idx],
+        marker="o",
+        linestyle="None",
+        color=green,
+        label=f"First {k_current} PCs"
+    )
+
+    ax_cum.set_title(f"{row_titles[row_idx]}: Cumulative Explained Variance")
+    ax_cum.set_xlabel("Principal Component")
+    ax_cum.set_ylabel("Cumulative Explained Variance Ratio")
+    ax_cum.set_xlim(0.5, max_plot_k + 0.5)
+    ax_cum.set_ylim(0, 1.02)
+    ax_cum.grid(alpha=0.2)
+    ax_cum.legend()
+
 plt.tight_layout()
 plt.show()
+```
+
+```{python}
+#| label: tbl-pca-cumulative-summary
+#| echo: false
+
+k_values = [k_min, k_parallel, k_95]
+
+summary_df = pd.DataFrame({
+    "Number of PCs": k_values,
+    "Cumulative Explained Variance": [cum_evr[k - 1] for k in k_values]
+})
+
+# optional: nicer formatting
+summary_df["Cumulative Explained Variance"] = summary_df["Cumulative Explained Variance"].round(4)
+
+summary_df
 ```
 
 ### Parallel Analysis
 
 ```{python}
+#| label: analyze-dimred-parallel-analysis-monte-carlo
+#| eval: true
+#| output: true
+
 def parallel_analysis(X, n_iter=500, percentile=95, random_state=None):
     rng = np.random.default_rng(random_state)
     n, p = X.shape
@@ -4189,31 +4055,12 @@ print(k_values)
 print("min =", min(k_values), "max =", max(k_values), "mean =", np.mean(k_values))
 ```
 
-Parallel analysis was performed using ```n_iter = 500``` Monte Carlo simulations. The selected number of components was checked for stability by repeating the simulation under multiple random seeds, and the resulting cutoff did not vary, indicating that the Monte Carlo approximation was adequate.
+Parallel analysis was performed using `n_iter = 500` Monte Carlo simulations. The selected number of components was checked for stability by repeating the simulation under multiple random seeds, and the resulting cutoff did not vary, indicating that the Monte Carlo approximation was adequate.
 
 
 
 
 ## Statistical Modelling
-
-```{ojs}
-//| label: section-div-06
-//| column: screen
-//| echo: False
-
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div class="current">Statistical Modelling</div>
-  <div>Conclusions</div>
-</div>
-`
- 
-```
 
 In this section we move from unsupervised structure discovery to supervised classification. The goal is not to optimize every modelling choice, but to complete a clean 80/20 modelling pipeline that is consistent with the assignment workflow: split first, fit preprocessing on the training data only, apply the learned transformations to the test data, then evaluate predictive performance.
 
@@ -4229,6 +4076,7 @@ The PCA code in the previous section fits PCA on the full dataset before any tra
 ### Build an 80/20 train-test pipeline
 
 ```{python}
+#| label: analyze-model-build-matrix
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
@@ -4263,6 +4111,7 @@ print(y_model.value_counts())
 ```
 
 ```{python}
+#| label: analyze-model-train-test-split
 # ---------------------------------------------------------
 # 2) 80/20 split (stratified)
 # ---------------------------------------------------------
@@ -4288,6 +4137,7 @@ print(y_test.value_counts())
 ### Fit the scaler and PCA on the training data only
 
 ```{python}
+#| label: analyze-model-fit-training-pca
 # ---------------------------------------------------------
 # 3) Standardize using training data only
 # ---------------------------------------------------------
@@ -4310,7 +4160,14 @@ print("Total explained variance from all training PCs:", pca_train.explained_var
 
 ### Visualize the first two training principal components
 
+@fig-model-training-pca-scatter shows the first two training-set principal components and is used only as a descriptive view of class separation in the training data.
+
+
 ```{python}
+#| label: fig-model-training-pca-scatter
+#| fig-cap: "Training-set PCA scatterplot using the first two principal components, coloured by subtype."
+#| fig-width: 8
+#| fig-height: 6
 # ---------------------------------------------------------
 # 5) Training PCA scatterplot (PC1 vs PC2)
 # ---------------------------------------------------------
@@ -4338,7 +4195,14 @@ plt.show()
 
 ### Scree plot and cumulative explained variance from the training PCA
 
+@fig-model-training-scree summarizes how much of the standardized training-set variation is captured by the first 25 principal components.
+
+
 ```{python}
+#| label: fig-model-training-scree
+#| fig-cap: "Training-set scree plot and cumulative explained variance for the first 25 principal components."
+#| fig-width: 12
+#| fig-height: 4
 # ---------------------------------------------------------
 # 6) Scree plot and cumulative variance for the first 25 PCs
 # ---------------------------------------------------------
@@ -4373,55 +4237,88 @@ print(f"Variance explained by first 25 PCs: {cum_evr_train[first_n - 1]:.2%}")
 
 ### Choose a reasonable number of PCs for multinomial logistic regression
 
-We will use a simple, defensible rule rather than hyperparameter tuning. The assignments ask for a discussion of the “One in Ten Rule” together with subtype balance. In a multinomial model with three classes, each non-reference logit gets its own coefficient vector. A conservative practical choice is therefore to limit the number of PCs so that the smallest training subtype still has enough observations per fitted coefficient.
+We will use a simple, defensible heuristic rather than hyperparameter tuning. The “one in ten” rule is not a theorem, but it is a conservative screening device for avoiding an overly large model relative to the smallest class. We therefore combine the parallel-analysis suggestion with a class-size cap and use the smaller value for the main model.
 
 ```{python}
+#| label: analyze-model-pc-choice
+#| echo: true
+#| warning: false
+#| message: false
+
 # ---------------------------------------------------------
-# 7) Pick a reasonable number of PCs for the main model
+# 7) Define the three PCA comparison choices
 # ---------------------------------------------------------
-# Smallest class size in the training data
 n_min_train = y_train.value_counts().min()
 
-# Simple conservative one-in-ten style cap:
-# at least ~10 observations in the smallest class per fitted slope,
-# then subtract 1 to leave room for the intercept.
-max_pcs_one_in_ten = int(np.floor(n_min_train / 10)) - 1
+# minimum comparison model
+k_min = 2
 
-# Parallel analysis result from above is reused if it exists.
-# If not, fall back to 25.
+# reuse training-PCA quantities
+evr_train = pca_train.explained_variance_ratio_
+cum_evr_train = np.cumsum(evr_train)
+
+# parallel-analysis choice from earlier section
 try:
     k_parallel_model = int(k_parallel)
 except NameError:
-    k_parallel_model = 25
+    raise ValueError("k_parallel is not defined. Run the training-based parallel analysis first.")
 
-k_model = min(k_parallel_model, max_pcs_one_in_ten, X_train_pca.shape[1])
+# 95% cumulative explained-variance choice
+k_95_model = int(np.argmax(cum_evr_train >= 0.95) + 1)
 
-## NOTE: We override this, and simply set it to the value we get from the parallel_model
-k_model = k_parallel_model
+# keep values within valid bounds
+max_valid_pcs = X_train_pca.shape[1]
+k_min = min(k_min, max_valid_pcs)
+k_parallel_model = min(k_parallel_model, max_valid_pcs)
+k_95_model = min(k_95_model, max_valid_pcs)
 
-# keep at least 2 PCs, but avoid the main model collapsing to the 2-PC baseline
-if k_model < 2:
-    k_model = 2
-elif k_model == 2 and k_parallel_model > 2:
-    k_model = min(10, k_parallel_model, X_train_pca.shape[1])
+k_values_to_compare = [k_min, k_parallel_model, k_95_model]
+k_values_to_compare = list(dict.fromkeys(k_values_to_compare))  # preserve order, remove duplicates
 
 print("Smallest training subtype count:", n_min_train)
-print("One-in-ten cap:", max_pcs_one_in_ten)
-print("Parallel-analysis suggestion:", k_parallel_model)
-print("Chosen number of PCs for main model:", k_model)
+print("k_min:", k_min)
+print("k_parallel:", k_parallel_model)
+print("k_95:", k_95_model)
+print("Component counts to compare:", k_values_to_compare)
+```
+
+```{python}
+#| label: tbl-model-pc-summary
+#| tbl-cap: "Three PCA dimension choices used for multinomial logistic-regression comparison."
+
+pc_summary_table = pd.DataFrame({
+    "Model": ["Minimum", "Parallel analysis", "95% cumulative explained variance"],
+    "Number of PCs": [k_min, k_parallel_model, k_95_model],
+    "Cumulative Explained Variance": [
+        cum_evr_train[k_min - 1],
+        cum_evr_train[k_parallel_model - 1],
+        cum_evr_train[k_95_model - 1]
+    ]
+})
+
+pc_summary_table["Cumulative Explained Variance"] = (
+    pc_summary_table["Cumulative Explained Variance"].round(4)
+)
+
+pc_summary_table
 ```
 
 ### Fit multinomial logistic regression models
 
-To keep the workflow simple, we will compare three models:
+To keep the workflow simple, we compare three models:
 
-- a very small model using the first 2 PCs,
-- a main model using the chosen number of PCs,
-- a much larger model using the first 100 PCs, or as many as are available if fewer than 100 are valid.
+- a minimal model using the first 2 principal components,
+- a model using the number of components selected by parallel analysis,
+- a model using the smallest number of components needed to reach 95% cumulative explained variance.
 
-Because the subtype classes may not be perfectly balanced, we will use `class_weight="balanced"` so that smaller classes are not ignored during fitting.
+Because the subtype classes may not be perfectly balanced, we use `class_weight="balanced"` so that smaller classes are not ignored during fitting.
 
 ```{python}
+#| label: analyze-model-helper-functions-inline
+#| echo: true
+#| eval: true
+#| warning: false
+#| message: false
 # ---------------------------------------------------------
 # 8) Helper functions for fitting and evaluation
 # ---------------------------------------------------------
@@ -4451,32 +4348,36 @@ def evaluate_model(model, X_pca, y_true, labels):
 ```
 
 ```{python}
-# ---------------------------------------------------------
-# 9) Fit the three comparison models
-# ---------------------------------------------------------
+#| label: tbl-model-results
+#| tbl-cap: "Held-out performance for multinomial logistic-regression models using 2 PCs, the parallel-analysis choice, and the 95% cumulative explained-variance choice."
+#| warning: false
+#| message: false
+
 labels = sorted(y_train.unique())
 
-k_2 = 2
-k_main = int(k_model)
-k_100 = min(100, X_train_pca.shape[1])
+model_results = {}
+results_rows = []
 
-model_2 = fit_multinomial_logit(X_train_pca, y_train, k_2)
-model_main = fit_multinomial_logit(X_train_pca, y_train, k_main)
-model_100 = fit_multinomial_logit(X_train_pca, y_train, k_100)
+for k in k_values_to_compare:
+    model = fit_multinomial_logit(X_train_pca, y_train, k)
+    res = evaluate_model(model, X_test_pca[:, :k], y_test, labels)
 
-res_2 = evaluate_model(model_2, X_test_pca[:, :k_2], y_test, labels)
-res_main = evaluate_model(model_main, X_test_pca[:, :k_main], y_test, labels)
-res_100 = evaluate_model(model_100, X_test_pca[:, :k_100], y_test, labels)
+    model_results[k] = {
+        "model": model,
+        "results": res
+    }
 
-results_table = pd.DataFrame({
-    "model": ["2 PCs", f"{k_main} PCs", f"{k_100} PCs"],
-    "accuracy": [res_2["accuracy"], res_main["accuracy"], res_100["accuracy"]],
-    "misclassification_rate": [
-        res_2["misclassification_rate"],
-        res_main["misclassification_rate"],
-        res_100["misclassification_rate"],
-    ],
-}).sort_values("misclassification_rate")
+    results_rows.append({
+        "model": f"{k} PCs",
+        "n_components": k,
+        "accuracy": res["accuracy"],
+        "misclassification_rate": res["misclassification_rate"]
+    })
+
+results_table = pd.DataFrame(results_rows).sort_values(
+    ["misclassification_rate", "n_components"],
+    ascending=[True, True]
+).reset_index(drop=True)
 
 results_table
 ```
@@ -4484,19 +4385,24 @@ results_table
 ### Confusion matrices
 
 ```{python}
-print("Confusion matrix: 2-PC model")
-display(res_2["confusion_matrix"])
+#| label: tbl-model-confusion-matrices
+#| echo: false
+#| warning: false
+#| message: false
 
-print(f"\nConfusion matrix: {k_main}-PC model")
-display(res_main["confusion_matrix"])
-
-print(f"\nConfusion matrix: {k_100}-PC model")
-display(res_100["confusion_matrix"])
+for k in k_values_to_compare:
+    print(f"Confusion matrix: {k}-PC model")
+    display(model_results[k]["results"]["confusion_matrix"])
+    print()
 ```
 
 ### Main results
 
+@tbl-model-results gives the held-out performance summary for the three comparison models.
+
+
 ```{python}
+#| label: analyze-model-best-result
 best_model_row = results_table.iloc[0]
 print(results_table)
 print("Best model by test misclassification rate:")
@@ -4513,905 +4419,11 @@ The most important modelling lesson here is that PCA belongs inside the training
 
 ## Conclusions
 
-```{ojs}
-//| label: section-div-07
-//| column: screen
-//| echo: False
+This project shows that high-dimensional analysis is best understood as a sequence of linked decisions rather than as a single isolated method. The data used here are already the product of prior biological and computational processing, which means that interpretation requires attention to provenance, normalization, identifier handling, feature selection, dimensional reduction, and modelling.
 
-html`
-<div class="section-div">
-  <div>Setup</div>
-  <div>Data Acquisition</div>
-  <div>Data Understanding</div>
-  <div>Data Cleaning</div>
-  <div>Dimension Reduction</div>
-  <div>Statistical Modelling</div>
-  <div class="current">Conclusions</div>
-</div>
-`
- 
-```
+The final modelling section therefore emphasizes a defensible workflow rather than aggressive optimization: the train/test split is established first, preprocessing is learned on the training data only, PCA is treated as part of the predictive pipeline, and results are summarized using held-out performance and confusion patterns.
 
-## Other stuff
+Substantively, the main conclusion is not that one single classifier or transformation is universally best, but that downstream conclusions depend on the whole analytical pipeline. Methodologically, the document argues for explicit assumptions, reproducible setup, and careful separation between exploratory analysis and predictive evaluation.
 
-```{python}
-%matplotlib inline
-def upper_quartile_nonzero(x: pd.Series, q: float = 0.75) -> float:
-    """Upper quartile excluding zeros/NaNs. Returns NaN if too few nonzero values."""
-    v = x.to_numpy(dtype=float)
-    v = v[np.isfinite(v)]
-    v = v[v > 0]
-    if v.size < 10:
-        return np.nan
-    return float(np.quantile(v, q))
 
-df = df_mrna_seq.copy()
-
-# 1) Put gene identifiers in the index (optional but nice)
-df = df.set_index(["Hugo_Symbol", "Entrez_Gene_Id"])
-
-# 2) Sample columns are now all remaining columns
-sample_cols = df.columns
-
-# 3) Coerce sample data to numeric (handles strings/object dtype safely)
-X = df.apply(pd.to_numeric, errors="coerce")  # same shape as df, but numeric/NaN
-
-# Helper: get nonzero values from one sample column
-def nonzero_vals(col: pd.Series):
-    v = col.dropna()
-    v = v[v > 0]
-    return v.values
-
-uq = X.apply(lambda s: np.quantile(nonzero_vals(s), 0.75) if nonzero_vals(s).size else np.nan, axis=0)
-```
-
-
-## Density overlays with quantiles
-```{python}
-#| eval: false
-#| output: false
-
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
-
-# df: genes x samples, UQ-normalized values
-# one column = one sample
-
-# -----------------------------
-# piecewise transform functions
-# -----------------------------
-def forward_transform(x, x_break=1000.0, xmax=None, left_frac=0.75):
-    """
-    Map data x to display coordinate t in [0, 1].
-
-    [0, x_break]      -> [0, left_frac]
-    [x_break, xmax]   -> [left_frac, 1]
-    """
-    x = np.asarray(x, dtype=float)
-    if xmax is None:
-        raise ValueError("xmax must be provided")
-
-    t = np.empty_like(x)
-
-    left = x <= x_break
-    right = ~left
-
-    # first segment
-    t[left] = left_frac * (x[left] / x_break)
-
-    # second segment
-    if xmax <= x_break:
-        t[right] = left_frac
-    else:
-        t[right] = left_frac + (1 - left_frac) * (x[right] - x_break) / (xmax - x_break)
-
-    return t
-
-
-def inverse_transform(t, x_break=1000.0, xmax=None, left_frac=0.75):
-    """
-    Inverse map from display coordinate t in [0, 1] back to data x.
-    """
-    t = np.asarray(t, dtype=float)
-    if xmax is None:
-        raise ValueError("xmax must be provided")
-
-    x = np.empty_like(t)
-
-    left = t <= left_frac
-    right = ~left
-
-    x[left] = x_break * (t[left] / left_frac)
-
-    if xmax <= x_break:
-        x[right] = x_break
-    else:
-        x[right] = x_break + (xmax - x_break) * (t[right] - left_frac) / (1 - left_frac)
-
-    return x
-
-
-# -----------------------------------
-# one density overlay plot for samples
-# -----------------------------------
-def density_overlay_piecewise_axis(
-    df,
-    max_samples=None,
-    bandwidth_adjust=1.0,
-    x_break=1000.0,
-    left_frac=0.75,
-    figsize=(10, 6)
-):
-    samples = df.columns if max_samples is None else df.columns[:max_samples]
-
-    # use positive values only for KDE
-    positive_max = df[df > 0].max().max()
-    xmax = float(positive_max) * 1.05
-
-    # grid in original data units
-    x_grid = np.linspace(0, xmax, 800)
-
-    fig, ax = plt.subplots(figsize=figsize)
-
-    for s in samples:
-        vals = df[s].to_numpy()
-        vals = vals[vals > 0]
-
-        if len(vals) < 2 or len(np.unique(vals)) < 2:
-            continue
-
-        kde = gaussian_kde(vals)
-        kde.set_bandwidth(kde.factor * bandwidth_adjust)
-        y = kde(x_grid)
-
-        # normalize each curve for visibility
-        # y = y / y.max()
-
-        # transform x for plotting
-        t_grid = forward_transform(x_grid, x_break=x_break, xmax=xmax, left_frac=left_frac)
-
-        ax.plot(t_grid, y, alpha=0.15, linewidth=1)
-
-    # mark the 1000 anchor
-    t_break = forward_transform(np.array([x_break]), x_break=x_break, xmax=xmax, left_frac=left_frac)[0]
-    ax.axvline(t_break, linestyle="--", linewidth=2)
-
-    # custom ticks in original units
-    tick_values = np.array([0, 250, 500, 750, 1000, 1500, 2000, 3000, 5000])
-    tick_values = tick_values[tick_values <= xmax]
-    tick_positions = forward_transform(tick_values, x_break=x_break, xmax=xmax, left_frac=left_frac)
-
-    ax.set_xticks(tick_positions)
-    ax.set_xticklabels([f"{int(v)}" for v in tick_values])
-
-    ax.set_xlim(0, 1)
-    ax.set_xlabel("UQ-normalized expression")
-    ax.set_ylabel("Scaled density")
-    ax.set_title("Sample density overlays with piecewise x-axis")
-    ax.grid(axis="y", alpha=0.2)
-
-    plt.tight_layout()
-    return fig, ax
-
-
-# Example call:
-# fig, ax = density_overlay_piecewise_axis(df, max_samples=60)
-# plt.show()
-```
-
-```{python}
-#| label: analyze-data-box-plot-builder
-#| eval: false
-#| display: false
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-# --------------------------------------------------
-# data: rows = genes, columns = samples
-# --------------------------------------------------
-df = X.copy()
-
-# --------------------------------------------------
-# piecewise continuous transform breakpoints
-# --------------------------------------------------
-xMin = 0.0
-Q3 = 1000.0
-U  = 1500.0
-E  = 2500.0
-xMax = 5000.0
-
-# widths:
-# 0 -> Q3         : 75%
-# Q3 -> U         : 75% of remaining
-# U -> E          : 75% of remaining
-# E -> M          : remainder
-w1 = 0.75
-w2 = 0.75 * (1 - w1)              # 0.1875
-w3 = 0.75 * (1 - w1 - w2)         # 0.046875
-w4 = 1 - w1 - w2 - w3             # 0.015625
-
-def forward_transform(x, Q3=1000.0, U=1500.0, E=2500.0, M=5000.0):
-    x = np.asarray(x, dtype=float)
-    t = np.empty_like(x)
-
-    s1 = x <= Q3
-    s2 = (x > Q3) & (x <= U)
-    s3 = (x > U) & (x <= E)
-    s4 = x > E
-
-    t[s1] = w1 * (x[s1] / Q3)
-    t[s2] = w1 + w2 * (x[s2] - Q3) / (U - Q3)
-    t[s3] = w1 + w2 + w3 * (x[s3] - U) / (E - U)
-    t[s4] = w1 + w2 + w3 + w4 * (x[s4] - E) / (M - E)
-
-    return t
-
-# --------------------------------------------------
-# order samples by median of expressed genes only
-# --------------------------------------------------
-sample_medians = {}
-zero_counts = {}
-
-for s in df.columns:
-    raw = df[s].to_numpy(dtype=float)
-    zero_counts[s] = np.sum(raw == 0)
-
-    vals = raw[np.isfinite(raw) & (raw > 0)]
-    sample_medians[s] = np.median(vals) if len(vals) > 0 else np.nan
-
-sample_medians = dict(sorted(sample_medians.items(), key=lambda kv: kv[1]))
-ordered_samples = list(sample_medians.keys())
-
-# --------------------------------------------------
-# global maximum over expressed genes only
-# --------------------------------------------------
-all_vals = df.to_numpy(dtype=float)
-all_pos = all_vals[np.isfinite(all_vals) & (all_vals > 0)]
-M = float(all_pos.max())
-
-# --------------------------------------------------
-# plot
-# --------------------------------------------------
-n = len(ordered_samples)
-fig_height = max(12, n * 0.20)
-
-fig, axes = plt.subplots(
-    nrows=n,
-    ncols=1,
-    figsize=(10, fig_height),
-    sharex=True
-)
-
-if n == 1:
-    axes = [axes]
-
-for ax, s in zip(axes, ordered_samples):
-    raw = df[s].to_numpy(dtype=float)
-    vals = raw[np.isfinite(raw) & (raw > 0)]
-
-    if len(vals) == 0:
-        continue
-
-    vals_t = forward_transform(vals, Q3=Q3, U=U, E=E, M=M)
-
-    ax.boxplot(
-        vals_t,
-        vert=False,
-        widths=0.6,
-        showfliers=True
-    )
-
-    ax.set_yticks([1])
-    ax.set_yticklabels([f"{s}  (zeros={zero_counts[s]})"], fontsize=7)
-
-    # reference lines
-    for v, ls in [(Q3, "--"), (U, ":"), (E, "-.")]:
-        ax.axvline(
-            forward_transform([v], Q3=Q3, U=U, E=E, M=M)[0],
-            linestyle=ls,
-            linewidth=0.8,
-            alpha=0.7
-        )
-
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["left"].set_visible(False)
-    ax.grid(axis="x", alpha=0.2)
-
-# --------------------------------------------------
-# custom ticks in original units
-# --------------------------------------------------
-tick_vals = np.array([0, 250, 500, 750, 1000, 1500, 2500], dtype=float)
-tick_pos = forward_transform(tick_vals, Q3=Q3, U=U, E=E, M=M)
-
-axes[-1].set_xticks(tick_pos)
-axes[-1].set_xticklabels([str(int(v)) for v in tick_vals])
-axes[-1].set_xlabel("RSEM UQ expression (expressed genes only; piecewise display scale)")
-
-fig.suptitle(
-    "Samples ordered by median expressed-gene expression\n"
-    "Zeros removed for plotting; zero counts shown in labels",
-    y=0.999
-)
-
-plt.tight_layout()
-plt.show()
-```
-
-
-## Looking at some data
-### Upper quartile per sample
-
-```{python}
-plt.figure(figsize=(6,4))
-plt.hist(uq.dropna().values, bins=40)
-plt.title("Per-sample Upper Quartile (75th percentile, nonzero)")
-plt.xlabel("UQ value")
-plt.ylabel("Number of samples")
-plt.tight_layout()
-plt.show()
-```
-
-### Sorted UQ line plot
-```{python}
-uq_sorted = np.sort(uq.dropna().values)
-
-plt.figure(figsize=(6,4))
-plt.plot(uq_sorted)
-plt.title("Sorted per-sample UQ values")
-plt.xlabel("Samples (sorted)")
-plt.ylabel("UQ value")
-plt.tight_layout()
-plt.show()
-```
-
-
-### Compare distributions across some samples (log10)
-```{python}
-chosen = list(sample_cols[:8])  # pick any 8 you want
-
-plt.figure(figsize=(8,5))
-for col in chosen:
-    v = nonzero_vals(X[col])
-    if v.size == 0:
-        continue
-    plt.hist(np.log10(v), bins=60, alpha=0.3)
-
-plt.title("log10(Expression) distributions (selected samples)")
-plt.xlabel("log10(expression)")
-plt.ylabel("Frequency")
-plt.tight_layout()
-plt.show()
-```
-
-### Coefficient of variation
-```{python}
-uq_clean = uq.dropna()
-cv = uq_clean.std() / uq_clean.mean()
-cv
-```
-
-
-## Exploration
-
-
-1. Isolate
-   1. Tumor Sample --> RNA
-   2. We isolate all the RNA
-2. Fragment
-   1. Isolated RNA --> 
-
-We take our tumor sample and isolate all of the RNA (or poly-A selected mRNA)
-turn Mature mRNA into RNA fragments, in a process called fragmentation.
-Then, with turn those RNA fragments into cDNA fragments, in a process called reverse transcription.
-This all goes into a High-throughput sequencing machine to give us sequences/reads of every fragment. This will be an ordered list of the chemicals (A C G T) ?? Do we read the RNA or the c-DNA strand
-
-Major Data Point 1: We now have a count of all the fragments (and what they are)
-
-All of these reads need to get aligned back to the original gene.
-
-### Problems
-- Different versions of Mature mRNA (which are referred to as an "isoform") can happen because of an issue during the processing from Pre-mRNA to Mature mRNA including:
-  - Alternative transcript initiation
-  - Alternative 5' splice site
-  - Altertiave 3' splice site
-  - Skipped exon
-  - Alternative polyadenylation
-  - ... others
-- It is expensive and takes a long time to do really long reads (e.g., the whole gene), which is why we need to fragment the mRNA into smaller pieces.
-  - This means that we might not always capture all the different isoforms.
-- Fragments might align to more than one isoform, or to a different gene.
-
-### Goal
-**Expression Analysis**, estimate a transcriptome, the set of all expressed transcripts and their frequencies in a cell at a given time. 
-
-- We can measure/calculate the relative expression (i.e., frequency) of two things in our sample:
-  - Transcripts (i.e., What proportion of the sample was expressed by a specific isoform, by transcripts?)
-    - e.g., There are a total of 100 transcripts in the whole sample. Isoform AAA1 was expressed by 88 of them.
-  - Nucleotides (i.e., What proportion of the sample was expressed by a specific isoform, by nucleotides?)
-    - e.g., There are a total of 1,000,000 nucleotides in the whole sample. Isoform BBB2 was expressed by 500,000 of them.
-
-### Somethingsomething
-
-Definitions
-All definitions are framed for cBioPortal, the software system (which includes a website, and database) for interactive exploration of multidimensional cancer genomics data sets.
-
-TCGA
-: The Cancer Genome Atlas, a project that profiles specific cancer types to understand their individual molecular landscape.
-
-PanCanAtlas
-: a Pan-Cancer Initiative that took all 33 TCGA cancer types and analyzed them together to compare molecular similarities and differences.
-
-Study
-: Often identified by its acronym (e.g., TCGA-LGG) represents the specific tumour cohort that was analyzed.
-
-Ontology
-: a set of concepts and categories in a subject area or domain that shows their properties and the relations between them
-
-OncoTree
-: the cancer type ontology used by cBioPortal, which has has a root node of Tissue, so Level 1 would be all the Tissue Sites, then they are categorized by cancer types.
-
-cBioPortal Data Model
-
-Database
-Studies
-Clinical Data
-Samples
-Sample Lists
-Patients
-Namespace Attributes
-Mutations
-Molecular Data
-Gene Panel Data
-Discrete Copy Number Alterations
-Molecular Profiles
-Genes
-Generic Assays
-Generic Assay Data
-Gene Panels
-Copy Number Segments
-Clinical Attributes
-Cancer Types
-
-
-
-
-Database, the 
-Dataset, the set of files for a particular study
-Data Type: Clinical
-Data Type: Molecular
-Sequencing
-RNA Sequencing
-RSEM
-
-
-RSEM defines the following; 
-
-For isoform $i$, 
-$\nu_i$, the fraction of nucleotides made up by a given gene or isoform
-$$
-\nu_i = \frac{\tau_i\ell_i}{\sum_j\tau_j\ell_j}
-$$
-
-$\tau_i$, the fraction of transcripts made up by a given gene or isoform
-$$
-\tau_i = \frac{\nu_i}{\ell_i}\left(\sum_j\frac{\nu_j}{\ell_j}\right)^{-1}
-$$
-
-where $\ell_i$ is the length, in nucleotides, of isoform $i$. 
-
- 
-The probability that the read sequence
-$$
-P(r|\theta) = \prod_{n=1}^N\sum_{i=0}^M\theta_i P(r_n|G_n=i)
-$$
-
-
-
-
-
-EM Algorithm
-- An iterative method to find (local) maximum likelihood estimates of parameters in statistical models, where the model depends on unobserved latent variables. 
-
-RSEM Model
-- Generates reads from a combination of isoform, start position, and orientation
-- $N$ the number of reads generated (independent and identically distributed)
-  - i.i.d is an assumption that is supported by uniform sampling, massive parallelization and high depth, random fragmentation, poisson/negative binomial approximation accounting for dispersion
-  - i.i.d. for rna-seq is rarely perfect, but is helpful for when we do differential expression analysis
-- $L$ the length of reads
-- Random Variables
-  - $R_n$, read sequences (i.e., observed data)
-- Latent Random Variables
-  - $G_n$, isoform (from which the read came from)
-  - $S_n$, start position (from which the read came from)
-  - $O_n$, orientation (from which the read came from)
-- Parameters
-  - $\theta = [\theta_0, ... , \theta_M]$, the expression levels
-    - We assume $M$, all possible isoforms in a transcriptome, is given
-
-
-More Details
-- $G_n \in \{0, ..., M\}$, where $0$ represents a 'noise' isoform, which generates reads that do not map to known isoforms.
-  - The probability of any given isoform is determined when the expression levels for that isoform equals 1. 
-  - $P(G_n=i | \theta) = \theta_i \text{  where  } \sum_i\theta_i = 1$
-- $S_n \in \{1, ..., \text{max}_i\ell_i}$, where $\ell_i$ is the length of isoform $i$
-  - $P(S_{n=j} | G_{n=i})$ is called the *read start position distribution* (RPSD)
-  - $P(S_{n=j} | G_{n=i}) = \ell^{-1}_i$, for reads generated uniformly across transcripts and mRNA with poly(A) tails
-    - The other models are not shown, because the important part is the relationship with length
-- $O_n \in \{0, 1\}$
-  - 0 indicating that the sequence of read n is in the same orientation as that of its parent isoform
-  - 1 indicating thet the sequence of read n is the reverse complement of its parent isoform
-- $R_n$ summarizes the hidden random variables for the $n$-th read with a set of indicator random variables
-  - $Z_{nijk} \text{  where  } Z_{njk} = 1 \text{ if } (G_n, S_n, O_n) = (i, j, k)$
-  - Therefore, the conditional probability of a read sequence derived from an isoform (other than the noise isoform) is given by
-
-$$
-P(R_n = \rho | Z_{njk} = 1) = \begin{cases}
-    \prod_{t=1}^L w_t(\rho_t , \gamma_{j+t-1}^i) \qquad k=0 \\
-    \prod_{t=1}^L w_t(\rho_t , \bar{\gamma}_{j+t-1}^i) \qquad k=1
-\end{cases}
-$$
-
-  - $\gamma^i$ is the sequence of the isoform $i$ and $\bar{\gamma}^i$ is its reverse complement
-  - $w_t(a,b)$ is a position-specific substitution matrix, where the value is the probability that we observe character $a$ as position $t$ of the read given that the corresponding character in the reference isoform sequence is $b$
-
-
-
-
-
-
-
-
-
-Expresseions at the gene level is simply the sum of the expression of possible isoforms. 
-
-NOTE: There is some really interesting Maths regarding the RSEM algorithm alternating between the E-step and the M-step that results in the concavity of the log likelihood function (i.e., guaranteed to reach a global maximum). 
-
-
-What the bloody hell does this even mean?
-
-We're looking at "genes.normalized_results" so it's going to be the sum of isoforms
-
-- RNASeqV2 = Processed using RSEM (RNA-Seq by Expectation-Maximization)
-  - Specifically data_mrna_seq_v2_rsem.txt = to the rsem.genes.normalized_results file from TCGA
-- RSEM calculates the estimated number of reads that aligned to a transcript (i.e., relative expression)
-  - **fraction of transcripts**
-  - **fraction of nucleotides**
-
-What do the numbers in data_mrna_seq_v2_rsem.txt mean? 
-```{python}
-1
-```
-
-
-🧬 From Shredded Spells to Gene Expression
-==========================================
-
-What We Actually Measured
--------------------------
-
-### 🔍 The Crime Scene (Biological Reality)
-
--   Tumor tissue contains RNA.
-
--   RNA represents **which genes are actively being used**.
-
--   We sequence millions of short fragments (reads).
-
--   Each read is a tiny piece of a transcript.
-
-* * * * *
-
-📖 The Reconstruction
----------------------
-
-We assume all fragments came from a known reference "book" (the human transcriptome).
-
-Using **RSEM (RNA-Seq by Expectation Maximization)**:
-
--   Reads are probabilistically assigned to transcript isoforms.
-
--   Isoform estimates are aggregated to gene-level estimates.
-
--   Values are corrected for:
-
-    -   Gene length
-
-    -   Sequencing depth
-
-    -   Multi-mapping reads
-
-The result:
-
-> A gene-by-sample matrix of estimated transcript abundance.
-
-* * * * *
-
-📊 What Each Row Represents
----------------------------
-
-**Hugo_Symbol**\
-The official gene name (e.g., TP53, IDH1).
-
-**Entrez_Gene_Id**\
-Stable numeric gene identifier (database key).
-
-Each row = one gene.\
-Each column = one tumor sample.\
-Each value = estimated mRNA abundance for that gene in that tumor.
-
-* * * * *
-
-📈 What the Numbers Mean
-------------------------
-
--   Continuous
-
--   Non-negative
-
--   Linear RSEM abundance estimates
-
--   Proportional to transcript abundance
-
--   Not raw molecule counts
-
--   Not mutation data
-
--   Not protein levels
-
-If Gene A = 200 and Gene B = 100 (within a sample):
-
-→ Gene A has approximately twice the estimated transcript abundance of Gene B.
-
-But:
-
-Magnitude ≠ importance.
-
-* * * * *
-
-🧠 What Matters Most
---------------------
-
-### 1️⃣ Same Gene Across Samples
-
-Biologically meaningful comparison.
-
-### 2️⃣ Variability Across Tumors
-
-High variance genes → informative\
-Low variance genes → housekeeping / background
-
-### 3️⃣ Expression ≠ Genome
-
-We measured gene **expression**, not gene presence or mutation.
-
-* * * * *
-
-🧬 Key Vocabulary
------------------
-
--   **Gene** -- DNA locus that produces RNA.
-
--   **Isoform** -- Alternative transcript version of a gene.
-
--   **Transcriptome** -- Total RNA expression profile of a sample.
-
--   **RSEM** -- Probabilistic transcript quantification method.
-
--   **Expected Counts** -- Model-based abundance estimates.
-
--   **Normalization** -- Adjusting for technical bias (not biological baseline).
-
--   **Variance** -- Spread across samples; often more informative than raw magnitude.
-
-* * * * *
-
-🎭 The Big Insight
-------------------
-
-Each tumor is not just a disease.
-
-It is:
-
-> A 20,531-dimensional expression profile\
-> describing which biological programs are active.
-
-We reconstructed the "spellbook."
-
-But the real story lives in:
-
--   Which chapters change.
-
--   Which remain constant.
-
--   And how patterns emerge across tumors.
-
-* * * * *
-
-⚠️ The Important Limitation
----------------------------
-
-Expression data tells us:
-
--   What instructions are active.
-
-It does NOT tell us:
-
--   Why they're active.
-
--   Whether they're mutated.
-
--   Whether protein levels match.
-
--   Whether the change is causal.
-
-This is one layer of biology.
-
-* * * * *
-
-🔥 Final Line for Class
------------------------
-
-> "We didn't count genes.\
-> We counted how loudly each gene was being read.\
-> And in that noise... the pattern begins to whisper."
-
-
-
-
-I'm trying to focus on simplifying and understanding sequencing for the cancer data project. 
-
-In the readme for one of the TCGA Pancan datasets, is something saying Tumor Break Load: 
- - TBL scores based on Lakbir et al., 2024 (Manuscript in progress)
- - Overview of TBL calculation for TCGA, from [Lakbir et al., Eur J Cancer 2024](https://pubmed.ncbi.nlm.nih.gov/36334560/)
- - Data is provided as a sample-level clinical attribute labeled `Tumor Break Load`
-
-... Is this relevant to what I want to know ... which is .... 
-First, what I think I understand: 
-
-We have a study (e.g. TCGA-LGG) that focuses on the particular cancer (CNV/Brain: LGG), which has some patients, who had a sample of the cancer taken. 
-That sample then went through a process which ended up in some data. 
-
-The lab stuff, I don't need to know (at least not details). In the end ... basically we have something that goes into a "Illumina HiSeq 2000 RNA Sequencing Version 2 analysis" - which is the name of a machine, and a particular set of settings/process used on that machine. 
-
-
-Part 1: Prepare a sequence library
-Steps: 
-1. Isolate the RNA
-2. Break the RNA into small fragments (because RNA transcripts can be very long and the machine can only sequence something short -- not sure how short)
-3. Convert the RNA fragments into double stranded DNA (cDNA?) - because double stranded DNA is more stable than RNA, and it can be easily amplified and modified
-4. Add sequencing adaptors (because two things: 1. Allows the sequencing machine to recognize the fragments, 2. could do many samples at once, with different adaptors)
-   1. Doesn't work 100% of the time
-5. PCR Amplify (not sure what this means or why it's important)
-6. Quality control
-   1. Verify Library concentration
-   2. Verify library fragment lengths
-
-Part 2: Sequence
-1. DNA is vertical, on a grid called a Flow Cell (maybe 400 million fragments are laid out ... is it all of them at once?)
-2. Colour coded (based on nucleotide) Fluorescent probes attach to the first base
-3. Machine takes picture - shows colours
-4. Washes the colours off the probes
-5. Repeats step 2-4 until done
-- Quality scores quantify how confident the machine is that it got the correct base, and some problems that affect this could be:
-  - a probe isn't bright enough, so machine isn't sure of the colour for a specific probe
-  - lots of probes of the same colour in the same region (bigger problem is it happens early in the sequencing) -- called low diversity
-
-THIS IS WHERE THE REAL "RAW" DATA IS
-
-So, a "read" is 4 lines of data: 
-@ Unique ID for the sequence
-Sequences that the machine got
-+
-Quality score for each base 
-
-?? Maybe a typical sequence run with 400 million reads, will generate a file with 1.6 billion lines of data 
-
-Part 3: Data Stuff?? (Not data analysis, per se ... more like preparing to give stuff for data analysis??) -- I'm pretty sure this is NOT part of the actual machine ... what we get from the machine is the raw data. Then we get into some basic data prep/cleansing  ... alignment to a genome ... counting the number of reads per gene (which includes or also has standardization/normalization).... 
-
-1. Filter out garbage reads
-   1. garbage reads are those with low quality base calls, reads that are clearly artifacts of the chemistry (e.g., adapters binded to each other, so the read is just adapter sequence)
-2. Align the high quality reads to a genome
-   1. We start with a genome (for us it's the human genome)
-   2. It gets split into small fragments 
-      1. This is because it allows us to align reads even if they are not exact matches to the reference genome; because genomes are not identical across the population
-   3. Fragments / Locations are indexed
-   4. Match read fragments to the genome fragments / locations
-      1. Genome fragments that match read fragments determine the location of the genome (chromosome/position)
-3. Count the number of reads per gene
-   1. Now we have chromosome/position for a read - we check if it falls within the coordinate of a gene (or another interesting feature)
-
-BAM - now we have a matrix of numbers: Rows are 1 per Gene, columns are samples, and values are the raw counts. 
-
-
-Not sure if we're doing "bulk" RNA-seq or "single-cell" RNA sequencing. 
-
-NOW ... data normalization ... Because samples might have a different number of reads (could be because of quality or concentration of flow cell)
-
-And ... this is when we get into RSEM... 
-
-
-
-
-So ... Am I correct or wrong? 
-
-
-
-digraph BioHybrid {
-    rankdir=LR;
-    node [fontname="Arial", fontsize=10];
-    edge [fontname="Arial", fontsize=9, color="#2c3e50", fontcolor="#2c3e50"];
-
-    // Material Style: A clean "Badge" look
-    node [shape=plaintext];
-
-    tumour [label=<
-        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2c3e50">
-            <TR><TD BGCOLOR="#34495e"><FONT COLOR="white"><B>Tumor Sample</B></FONT></TD></TR>
-            <TR><TD>250 mg</TD></TR>
-        </TABLE>>];
-
-    rna [label=<
-        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#27ae60">
-            <TR><TD BGCOLOR="#2ecc71"><FONT COLOR="white"><B>Total RNA</B></FONT></TD></TR>
-            <TR><TD>1-5 µg</TD></TR>
-        </TABLE>>];
-
-    mrna [label=<
-        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#2980b9">
-            <TR><TD BGCOLOR="#3498db"><FONT COLOR="white"><B>mRNA</B></FONT></TD></TR>
-            <TR><TD>1-5% of Total</TD></TR>
-        </TABLE>>];
-
-    cdna [label=<
-        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#8e44ad">
-            <TR><TD BGCOLOR="#9b59b6"><FONT COLOR="white"><B>cDNA Library</B></FONT></TD></TR>
-            <TR><TD>Ready for Seq</TD></TR>
-        </TABLE>>];
-
-    // Edges with Process Labels
-    // Using 'labeldistance' or just simple labels
-    tumour -> rna [label="  Isolation  ", penwidth=2];
-    rna -> mrna [label="  Enrichment  ", penwidth=2];
-    mrna -> cdna [label="  Reverse Transcription\n+ Library Prep  ", penwidth=2];
-}
-
-## New Grid for things
-
-```{ojs}
-ag = require("https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js")
-
-gridOptions = ({
-  rowData: [
-    { make: "Tesla", model: "Model Y", price: 64950, electric: true },
-    { make: "Ford", model: "F-Series", price: 33850, electric: false },
-    { make: "Toyota", model: "Corolla", price: 29600, electric: false },
-    { make: "Mercedes", model: "EQA", price: 48890, electric: true },
-    { make: "Fiat", model: "500", price: 15774, electric: false },
-    { make: "Nissan", model: "Juke", price: 20675, electric: false }
-  ],
-  columnDefs: [
-    { field: "make" },
-    { field: "model" },
-    { field: "price" },
-    { field: "electric" }
-  ]
-})
-
-gridApi = ag.createGrid(myGrid, gridOptions)
-gridApi
-```
-
-
-:::{#myGrid .ag-theme-quartz style="height: 500px;"}
-
-:::
-
-
-
-
-
-
-
+The document therefore supports a cautious substantive claim and a stronger methodological one: in high-dimensional genomics, what we conclude depends not only on the observed data, but on the sequence of preprocessing and modelling decisions used to turn those data into evidence.

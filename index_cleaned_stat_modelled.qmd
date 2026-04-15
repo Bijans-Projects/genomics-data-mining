@@ -4279,9 +4279,11 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 print("Training shape:", X_train.shape)
 print("Testing shape:", X_test.shape)
-print("\nTraining subtype counts:")
+print("
+Training subtype counts:")
 print(y_train.value_counts())
-print("\nTesting subtype counts:")
+print("
+Testing subtype counts:")
 print(y_test.value_counts())
 ```
 
@@ -4327,7 +4329,8 @@ fig, ax = plt.subplots(figsize=(8, 6))
 for subtype, group in train_pca_df.groupby("SUBTYPE"):
     ax.scatter(group["PC1"], group["PC2"], alpha=0.7, label=subtype)
 
-ax.set_title(f"Training PCA: PC1 vs PC2\nPC1={ev_train[0]:.2%}, PC2={ev_train[1]:.2%}")
+ax.set_title(f"Training PCA: PC1 vs PC2
+PC1={ev_train[0]:.2%}, PC2={ev_train[1]:.2%}")
 ax.set_xlabel("PC1")
 ax.set_ylabel("PC2")
 ax.grid(alpha=0.2)
@@ -4385,7 +4388,7 @@ n_min_train = y_train.value_counts().min()
 # Simple conservative one-in-ten style cap:
 # at least ~10 observations in the smallest class per fitted slope,
 # then subtract 1 to leave room for the intercept.
-max_pcs_one_in_ten = int(np.floor(n_min_train / 10)) - 1
+max_pcs_one_in_ten = max(2, int(np.floor(n_min_train / 10)) - 1)
 
 # Parallel analysis result from above is reused if it exists.
 # If not, fall back to 25.
@@ -4395,15 +4398,6 @@ except NameError:
     k_parallel_model = 25
 
 k_model = min(k_parallel_model, max_pcs_one_in_ten, X_train_pca.shape[1])
-
-## NOTE: We override this, and simply set it to the value we get from the parallel_model
-k_model = k_parallel_model
-
-# keep at least 2 PCs, but avoid the main model collapsing to the 2-PC baseline
-if k_model < 2:
-    k_model = 2
-elif k_model == 2 and k_parallel_model > 2:
-    k_model = min(10, k_parallel_model, X_train_pca.shape[1])
 
 print("Smallest training subtype count:", n_min_train)
 print("One-in-ten cap:", max_pcs_one_in_ten)
@@ -4427,6 +4421,7 @@ Because the subtype classes may not be perfectly balanced, we will use `class_we
 # ---------------------------------------------------------
 def fit_multinomial_logit(X_train_pca, y_train, n_pcs):
     model = LogisticRegression(
+        multi_class="multinomial",
         solver="lbfgs",
         class_weight="balanced",
         max_iter=5000,
@@ -4487,10 +4482,12 @@ results_table
 print("Confusion matrix: 2-PC model")
 display(res_2["confusion_matrix"])
 
-print(f"\nConfusion matrix: {k_main}-PC model")
+print(f"
+Confusion matrix: {k_main}-PC model")
 display(res_main["confusion_matrix"])
 
-print(f"\nConfusion matrix: {k_100}-PC model")
+print(f"
+Confusion matrix: {k_100}-PC model")
 display(res_100["confusion_matrix"])
 ```
 
@@ -4499,7 +4496,8 @@ display(res_100["confusion_matrix"])
 ```{python}
 best_model_row = results_table.iloc[0]
 print(results_table)
-print("Best model by test misclassification rate:")
+print("
+Best model by test misclassification rate:")
 print(best_model_row)
 ```
 
@@ -4508,8 +4506,6 @@ print(best_model_row)
 At this stage, we are not trying to optimize the final classifier. Instead, we want a complete and coherent modelling pipeline that respects the training/testing split and lets us compare downstream conclusions under a fixed sequence of decisions.
 
 The most important modelling lesson here is that PCA belongs inside the training pipeline when the goal is prediction. Exploratory PCA on the full dataset is useful for visualization, but predictive evaluation must keep the test set isolated until the very end.
-
-
 
 ## Conclusions
 
